@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pokédex</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="Pokeball_PixelArt_Transparent.png">
+</head>
+<body>
+
+  <!-- ═══ OPENING ANIMATION ═══ -->
+  <div class="intro-overlay" id="introOverlay">
+    <div class="intro-top">
+      <div class="intro-lights">
+        <div class="light light-big"></div>
+        <div class="intro-lights-sm">
+          <div class="light light-sm light-red"></div>
+          <div class="light light-sm light-yellow"></div>
+          <div class="light light-sm light-green"></div>
+        </div>
+      </div>
+      <div class="intro-center">
+        <div class="intro-title">POKÉDEX</div>
+        <div class="intro-subtitle">NATIONAL DEX</div>
+        <div class="intro-bar"></div>
+      </div>
+      <div class="intro-camera"></div>
+    </div>
+    <div class="intro-bottom">
+      <div class="intro-dpad">
+        <div class="dpad-arm dpad-h"></div>
+        <div class="dpad-arm dpad-v"></div>
+        <div class="dpad-cross"></div>
+      </div>
+      <div class="intro-buttons">
+        <div class="intro-btn-pair">
+          <div class="ibtn ibtn-a">A</div>
+          <div class="ibtn ibtn-b">B</div>
+        </div>
+        <div class="intro-speaker">
+          <div class="sp-dot"></div><div class="sp-dot"></div><div class="sp-dot"></div>
+          <div class="sp-dot"></div><div class="sp-dot"></div><div class="sp-dot"></div>
+        </div>
+      </div>
+      <div class="intro-yellow-btn"></div>
+    </div>
+  </div>
+
+  <!-- ═══ MAIN APP ═══ -->
+  <div class="app-root">
+
+    <!-- HEADER -->
+    <header class="pokedex-header">
+      <div class="header-hw">
+        <div class="hw-lights">
+          <div class="light light-big" id="bigLight"></div>
+          <div class="hw-lights-sm">
+            <div class="light light-sm light-red"></div>
+            <div class="light light-sm light-yellow"></div>
+            <div class="light light-sm light-green"></div>
+          </div>
+        </div>
+        <div class="hw-ridges">
+          <div class="ridge"></div>
+          <div class="ridge"></div>
+          <div class="ridge"></div>
+        </div>
+      </div>
+      <div class="header-main">
+        <h1 class="main-title">POKÉDEX</h1>
+        <p class="subtitle">NATIONAL DEX · 1025 ENTRIES</p>
+      </div>
+      <div class="header-side">
+        <button class="hw-btn hw-btn-sm" id="musicBtn" title="Música ambiente (M)">
+          <span class="hw-btn-icon">♪</span>
+          <span class="hw-btn-label" id="musicLabel">OFF</span>
+        </button>
+        <button class="hw-btn" id="randomBtn" title="Pokémon aleatorio (R)">
+          <span class="hw-btn-icon">⌬</span>
+          <span class="hw-btn-label">RAND</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- MODE SWITCHER -->
+    <nav class="mode-switcher" id="modeSwitcher">
+      <button class="mode-tab active" data-mode="pokedex">📖 <span>POKÉDEX</span></button>
+      <button class="mode-tab" data-mode="quiz">❓ <span>¿QUIÉN ES?</span></button>
+      <button class="mode-tab" data-mode="duel">⚔️ <span>DUELO 1v1</span></button>
+      <button class="mode-tab" data-mode="team">🛡️ <span>EQUIPO</span></button>
+      <button class="mode-tab" data-mode="damage">💥 <span>DAÑO</span></button>
+      <button class="mode-tab" data-mode="roulette">🎲 <span>RULETA</span></button>
+    </nav>
+
+    <!-- BODY -->
+    <main class="pokedex-body">
+
+      <!-- ═══════════════════════════════
+           MODE: POKÉDEX  (catalog + detail)
+      ═══════════════════════════════ -->
+      <section class="mode-view" id="modePokedex">
+
+      <!-- FILTER BAR -->
+      <div class="filter-bar">
+        <div class="filter-row">
+          <div class="filter-group">
+            <span class="filter-label">▸ TIPO</span>
+            <select class="filter-sel" id="filterType">
+              <option value="">Todos</option>
+              <option value="normal">Normal</option>
+              <option value="fire">Fuego</option>
+              <option value="water">Agua</option>
+              <option value="grass">Planta</option>
+              <option value="electric">Eléctrico</option>
+              <option value="ice">Hielo</option>
+              <option value="fighting">Lucha</option>
+              <option value="poison">Veneno</option>
+              <option value="ground">Tierra</option>
+              <option value="flying">Volador</option>
+              <option value="psychic">Psíquico</option>
+              <option value="bug">Bicho</option>
+              <option value="rock">Roca</option>
+              <option value="ghost">Fantasma</option>
+              <option value="dragon">Dragón</option>
+              <option value="dark">Siniestro</option>
+              <option value="steel">Acero</option>
+              <option value="fairy">Hada</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <span class="filter-label">▸ REGIÓN</span>
+            <select class="filter-sel" id="filterRegion">
+              <option value="">Todas</option>
+              <option value="kanto">Kanto (I)</option>
+              <option value="johto">Johto (II)</option>
+              <option value="hoenn">Hoenn (III)</option>
+              <option value="sinnoh">Sinnoh (IV)</option>
+              <option value="unova">Unova (V)</option>
+              <option value="kalos">Kalos (VI)</option>
+              <option value="alola">Alola (VII)</option>
+              <option value="galar">Galar (VIII)</option>
+              <option value="paldea">Paldea (IX)</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <span class="filter-label">▸ ORDEN</span>
+            <select class="filter-sel" id="filterSort">
+              <option value="id-asc">N.º ↑ Asc.</option>
+              <option value="id-desc">N.º ↓ Desc.</option>
+              <option value="name-asc">A → Z</option>
+              <option value="name-desc">Z → A</option>
+            </select>
+          </div>
+          <div class="filter-group filter-name-group">
+            <span class="filter-label">▸ BÚSQUEDA</span>
+            <input class="filter-input" id="filterName" placeholder="pikachu, 25..." autocomplete="off" />
+          </div>
+          <div class="filter-count-wrap">
+            <span class="filter-count" id="filterCount">— Pokémon</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- STAGE SECTION (Carousel) -->
+      <section class="stage-section">
+        <div class="stage-aura" id="stageAura"></div>
+        <div class="stage-grid-bg"></div>
+
+        <button class="stage-nav stage-nav-prev" id="navPrev" aria-label="Anterior">
+          <span>◀</span>
+        </button>
+
+        <div class="stage" id="stage"></div>
+
+        <button class="stage-nav stage-nav-next" id="navNext" aria-label="Siguiente">
+          <span>▶</span>
+        </button>
+
+        <div class="stage-info">
+          <div class="stage-info-meta">
+            <span class="stage-info-num" id="stageNum">#000</span>
+            <span class="stage-info-divider">•</span>
+            <span class="stage-info-genus" id="stageGenus">Pokémon</span>
+          </div>
+          <h2 class="stage-info-name" id="stageName">─────</h2>
+          <div class="stage-info-types" id="stageTypes"></div>
+          <div class="stage-tools">
+            <button class="stage-tool" id="cryBtn" title="Reproducir grito (C)">
+              <span class="st-icon">🔊</span><span class="st-label">GRITO</span>
+            </button>
+            <button class="stage-tool" id="shinyBtn" title="Variante shiny (S)">
+              <span class="st-icon">✦</span><span class="st-label">SHINY</span>
+            </button>
+            <button class="stage-tool" id="animBtn" title="Sprites animados (A)">
+              <span class="st-icon">▶</span><span class="st-label">ANIM</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- PAGINATION -->
+      <div class="pagination" id="pagination">
+        <button class="pag-btn" id="pagFirst" title="Primero">⟪</button>
+        <button class="pag-btn" id="pagBack10" title="Retroceder 10">«</button>
+        <div class="pag-counter">
+          <span class="pag-current" id="pagCurrent">001</span>
+          <span class="pag-divider">/</span>
+          <span class="pag-total" id="pagTotal">1025</span>
+        </div>
+        <button class="pag-btn" id="pagFwd10" title="Avanzar 10">»</button>
+        <button class="pag-btn" id="pagLast" title="Último">⟫</button>
+      </div>
+
+      <!-- DETAIL CARD -->
+      <div class="card-wrapper hidden" id="cardWrapper">
+        <div class="card-loading hidden" id="cardLoading">
+          <div class="ball"></div>
+        </div>
+        <div class="pokedex-card" id="pokedexCard">
+          <div class="card-left">
+            <div class="poke-number-badge" id="pokeNumber">#000</div>
+            <div class="screen-frame">
+              <div class="screen-corner tl"></div>
+              <div class="screen-corner tr"></div>
+              <div class="screen-corner bl"></div>
+              <div class="screen-corner br"></div>
+              <div class="screen">
+                <img class="pokemon-img" id="pokemonSprite" src="" alt="" />
+                <div class="screen-scanlines"></div>
+              </div>
+            </div>
+            <div class="types-row" id="typesRow"></div>
+            <div class="varieties-wrap hidden" id="varietiesWrap">
+              <div class="varieties-label">▸ FORMAS</div>
+              <div class="varieties-list" id="varietiesList"></div>
+            </div>
+            <div class="meta-row">
+              <div class="meta-box">
+                <span class="meta-label">Altura</span>
+                <span class="meta-val" id="pokeHeight">—</span>
+              </div>
+              <div class="meta-sep">|</div>
+              <div class="meta-box">
+                <span class="meta-label">Peso</span>
+                <span class="meta-val" id="pokeWeight">—</span>
+              </div>
+            </div>
+            <div class="meta-box full-width">
+              <span class="meta-label">Experiencia Base</span>
+              <span class="meta-val" id="pokeExp">—</span>
+            </div>
+          </div>
+
+          <div class="card-right">
+            <h2 class="pokemon-name" id="pokeName">???</h2>
+            <p class="pokemon-genus" id="pokeGenus">Pokémon</p>
+            <div class="section-block">
+              <div class="section-title-row">
+                <div class="section-title">◆ ENTRADA POKÉDEX</div>
+                <select class="version-sel" id="versionSel" title="Versión del juego"></select>
+              </div>
+              <p class="poke-description" id="pokeDescription">—</p>
+            </div>
+            <div class="section-block">
+              <div class="section-title">◆ CADENA EVOLUTIVA</div>
+              <div class="evo-chain" id="evoChain">
+                <span class="evo-empty">—</span>
+              </div>
+            </div>
+            <div class="section-block">
+              <div class="section-title">◆ HABILIDADES <small class="section-hint">(click para detalle)</small></div>
+              <div class="abilities-list" id="pokeAbilities"></div>
+            </div>
+            <div class="section-block">
+              <div class="section-title">◆ DEBILIDADES Y RESISTENCIAS</div>
+              <div class="weaknesses-grid" id="weaknessesGrid"></div>
+            </div>
+            <div class="section-block">
+              <div class="section-title">◆ ESTADÍSTICAS BASE</div>
+              <div class="stats-list" id="pokeStats"></div>
+            </div>
+            <div class="section-block">
+              <div class="section-title">◆ MOVIMIENTOS <small class="section-hint">(click para detalle)</small></div>
+              <div class="moves-list" id="pokeMoves"></div>
+            </div>
+            <div class="section-block">
+              <div class="section-title">◆ LOCALIZACIONES</div>
+              <div class="locations-list" id="locationsList">
+                <span class="loc-empty">—</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ MODAL (moves / abilities) ═══ -->
+      <div class="modal-overlay hidden" id="modalOverlay">
+        <div class="modal-card">
+          <button class="modal-close" id="modalClose" aria-label="Cerrar">✕</button>
+          <div class="modal-loading hidden" id="modalLoading">
+            <div class="ball"></div>
+          </div>
+          <div class="modal-content" id="modalContent"></div>
+        </div>
+      </div>
+
+      <!-- LOADING / EMPTY / ERROR STATES -->
+      <div class="catalog-loading" id="catalogLoading">
+        <div class="ball"></div>
+        <p class="loading-text">Cargando Pokédex Nacional...</p>
+      </div>
+
+      <div class="no-results hidden" id="noResults">
+        <span class="no-results-icon">⬡</span>
+        <p>No se encontraron Pokémon con esos filtros.</p>
+      </div>
+
+      <div class="catalog-error hidden" id="catalogError">
+        <span>⚠ Error al cargar. Por favor recarga la página.</span>
+      </div>
+
+      <div class="type-loading hidden" id="typeLoading">
+        <p class="loading-text">Filtrando...</p>
+      </div>
+
+      <!-- KEYBOARD HINT -->
+      <div class="kbd-hint">
+        <span><kbd>←</kbd> <kbd>→</kbd> Navegar</span>
+        <span><kbd>R</kbd> Aleatorio</span>
+        <span><kbd>C</kbd> Grito</span>
+        <span><kbd>S</kbd> Shiny</span>
+        <span><kbd>A</kbd> Animar</span>
+        <span><kbd>M</kbd> Música</span>
+        <span><kbd>/</kbd> Buscar</span>
+      </div>
+
+      </section><!-- /modePokedex -->
+
+      <!-- ═══════════════════════════════
+           MODE: ¿QUIÉN ES ESE POKÉMON?
+      ═══════════════════════════════ -->
+      <section class="mode-view hidden" id="modeQuiz">
+        <div class="quiz-card">
+          <div class="quiz-header">
+            <h2 class="quiz-title">¿QUIÉN ES ESE POKÉMON?</h2>
+            <div class="quiz-score">
+              <div class="qs-stat"><span class="qs-label">RACHA</span><span class="qs-val" id="quizStreak">0</span></div>
+              <div class="qs-stat"><span class="qs-label">ACIERTOS</span><span class="qs-val" id="quizCorrect">0</span></div>
+              <div class="qs-stat"><span class="qs-label">TOTAL</span><span class="qs-val" id="quizTotal">0</span></div>
+              <div class="qs-stat"><span class="qs-label">MEJOR</span><span class="qs-val" id="quizBest">0</span></div>
+            </div>
+          </div>
+          <div class="quiz-stage">
+            <div class="quiz-silhouette" id="quizSilhouette">
+              <img id="quizImg" alt=""/>
+            </div>
+          </div>
+          <div class="quiz-prompt" id="quizPrompt">¡Adivina!</div>
+          <div class="quiz-options" id="quizOptions"></div>
+          <button class="quiz-next hidden" id="quizNext">▶ SIGUIENTE</button>
+          <div class="quiz-difficulty">
+            <label>Dificultad:</label>
+            <select id="quizDifficulty">
+              <option value="kanto">Kanto (fácil)</option>
+              <option value="gen5">Gen I-V (medio)</option>
+              <option value="all" selected>Todos (difícil)</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════════════════════════
+           MODE: DUELO  1 v 1
+      ═══════════════════════════════ -->
+      <section class="mode-view hidden" id="modeDuel">
+        <div class="duel-wrap">
+          <div class="duel-pickers">
+            <div class="duel-slot" data-side="A">
+              <div class="duel-slot-label">CONTENDIENTE A</div>
+              <div class="pkm-picker" id="duelPickerA"></div>
+              <div class="duel-preview" id="duelPreviewA">
+                <span class="duel-empty">Selecciona un Pokémon</span>
+              </div>
+            </div>
+            <div class="duel-vs">VS</div>
+            <div class="duel-slot" data-side="B">
+              <div class="duel-slot-label">CONTENDIENTE B</div>
+              <div class="pkm-picker" id="duelPickerB"></div>
+              <div class="duel-preview" id="duelPreviewB">
+                <span class="duel-empty">Selecciona un Pokémon</span>
+              </div>
+            </div>
+          </div>
+          <div class="duel-results hidden" id="duelResults"></div>
+        </div>
+      </section>
+
+      <!-- ═══════════════════════════════
+           MODE: CONSTRUCTOR DE EQUIPO
+      ═══════════════════════════════ -->
+      <section class="mode-view hidden" id="modeTeam">
+        <div class="team-wrap">
+          <div class="team-header">
+            <h2 class="tool-title">🛡️ CONSTRUCTOR DE EQUIPO</h2>
+            <div class="team-picker">
+              <div class="pkm-picker" id="teamPicker"></div>
+              <button class="team-clear" id="teamClear">⌫ Limpiar</button>
+            </div>
+          </div>
+          <div class="team-slots" id="teamSlots"></div>
+          <div class="team-analysis hidden" id="teamAnalysis">
+            <div class="team-radar-wrap">
+              <div class="ta-section-title">◆ STATS PROMEDIO</div>
+              <svg class="team-radar" id="teamRadar" viewBox="0 0 280 280"></svg>
+              <div class="team-totals" id="teamTotals"></div>
+            </div>
+            <div class="team-coverage-wrap">
+              <div class="ta-section-title">◆ DEBILIDADES DEL EQUIPO</div>
+              <p class="ta-help">Cuántos miembros son débiles a cada tipo (×2 o ×4)</p>
+              <div class="team-coverage" id="teamCoverage"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════════════════════════
+           MODE: CALCULADORA DE DAÑO
+      ═══════════════════════════════ -->
+      <section class="mode-view hidden" id="modeDamage">
+        <div class="dmg-wrap">
+          <h2 class="tool-title">💥 CALCULADORA DE DAÑO</h2>
+          <div class="dmg-form">
+            <div class="dmg-field">
+              <label>ATACANTE</label>
+              <div class="pkm-picker" id="dmgPickerAtk"></div>
+              <div class="dmg-mini-preview" id="dmgAtkPreview"></div>
+            </div>
+            <div class="dmg-field">
+              <label>DEFENSOR</label>
+              <div class="pkm-picker" id="dmgPickerDef"></div>
+              <div class="dmg-mini-preview" id="dmgDefPreview"></div>
+            </div>
+            <div class="dmg-field">
+              <label>MOVIMIENTO</label>
+              <select class="dmg-move-sel" id="dmgMoveSel" disabled>
+                <option>Selecciona el atacante primero</option>
+              </select>
+            </div>
+            <div class="dmg-field">
+              <label>NIVEL <span id="dmgLvlVal">50</span></label>
+              <input type="range" min="1" max="100" value="50" class="dmg-lvl" id="dmgLvl"/>
+            </div>
+          </div>
+          <div class="dmg-results hidden" id="dmgResults"></div>
+        </div>
+      </section>
+
+      <!-- ═══════════════════════════════
+           MODE: RULETA ALEATORIA
+      ═══════════════════════════════ -->
+      <section class="mode-view hidden" id="modeRoulette">
+        <div class="rou-wrap">
+          <h2 class="tool-title">🎲 RULETA NUZLOCKE</h2>
+          <p class="tool-subtitle">Genera un equipo aleatorio para tu próximo run</p>
+          <div class="rou-config">
+            <div class="rou-field">
+              <label>CANTIDAD</label>
+              <input type="number" min="1" max="12" value="6" id="rouCount" class="rou-input"/>
+            </div>
+            <div class="rou-field">
+              <label>REGIÓN</label>
+              <select id="rouRegion" class="rou-input">
+                <option value="">Cualquiera</option>
+                <option value="kanto">Kanto</option>
+                <option value="johto">Johto</option>
+                <option value="hoenn">Hoenn</option>
+                <option value="sinnoh">Sinnoh</option>
+                <option value="unova">Unova</option>
+                <option value="kalos">Kalos</option>
+                <option value="alola">Alola</option>
+                <option value="galar">Galar</option>
+                <option value="paldea">Paldea</option>
+              </select>
+            </div>
+            <div class="rou-field">
+              <label>TIPO</label>
+              <select id="rouType" class="rou-input">
+                <option value="">Cualquiera</option>
+                <option value="normal">Normal</option><option value="fire">Fuego</option>
+                <option value="water">Agua</option><option value="grass">Planta</option>
+                <option value="electric">Eléctrico</option><option value="ice">Hielo</option>
+                <option value="fighting">Lucha</option><option value="poison">Veneno</option>
+                <option value="ground">Tierra</option><option value="flying">Volador</option>
+                <option value="psychic">Psíquico</option><option value="bug">Bicho</option>
+                <option value="rock">Roca</option><option value="ghost">Fantasma</option>
+                <option value="dragon">Dragón</option><option value="dark">Siniestro</option>
+                <option value="steel">Acero</option><option value="fairy">Hada</option>
+              </select>
+            </div>
+            <div class="rou-field rou-toggles">
+              <label class="rou-check">
+                <input type="checkbox" id="rouUnique" checked/>
+                <span>Sin repetir tipos</span>
+              </label>
+              <label class="rou-check">
+                <input type="checkbox" id="rouNoLegendary"/>
+                <span>Sin legendarios</span>
+              </label>
+            </div>
+            <button class="rou-roll" id="rouRoll">🎲 GENERAR</button>
+          </div>
+          <div class="rou-result" id="rouResult"></div>
+        </div>
+      </section>
+
+    </main>
+
+    <footer class="site-footer">
+      <span>© 2025 Pokédex Research</span>
+      <span class="footer-dot">·</span>
+      <span>Markus Sounds</span>
+      <span class="footer-dot">·</span>
+      <span>PokéAPI</span>
+    </footer>
+
+  </div>
+
+  <script src="js/index.js" defer></script>
+</body>
+</html>
