@@ -1,22 +1,3 @@
-🎮 Inmersión / "feel" Pokémon
-Cry / grito del Pokémon 🔊 — PokéAPI tiene cries.latest con el audio real de cada uno. Botón de bocina en la tarjeta → suena el grito al estilo anime. ULTRA satisfactorio.
-Sprites animados (GIF) — los sprites de Black/White se mueven. Toggle "modo animado" en el catálogo para verlos respirando/moviéndose en lugar de quietos.
-Modo shiny ✨ — botón que cambia entre sprite normal y shiny, con un pequeño efecto de partículas doradas.
-Descripción del Pokédex — la API trae las descripciones reales de cada juego ("Cuando se enoja, suelta una llama por la cola..."). Mostrarlas en español, con un selector de "según qué juego".
-Música de fondo — un loop ambient retro-Pokémon (8-bit) con toggle mute. Cambia el track según la región del Pokémon centrado (música de Kanto, Johto, etc.).
-📚 Profundidad de información
-Cadena evolutiva visual 🧬 — la mejor feature posible. Mostrar Bulbasaur → Ivysaur → Venusaur con sprites y nivel/método de evolución (piedra, intercambio, felicidad, etc.). Click en cualquiera para saltar a él.
-Tabla de debilidades/resistencias — calcular automáticamente contra qué tipos es x4, x2, x1, x½, x¼, x0. Visualización con grid de colores.
-Movimientos completos con detalle — clic en un movimiento → modal con potencia, precisión, tipo, PP, descripción, categoría (físico/especial/estado).
-Habilidades con descripción — actualmente solo se ven los nombres. Hover/click para ver qué hace cada habilidad.
-Ubicaciones donde aparece — "¿dónde lo encuentro?" con la lista de rutas/zonas por juego.
-Variantes regionales y formas — Alolan Raichu, Galarian Ponyta, Mega Evoluciones, Gigamax. Toggle para alternar entre formas.
-🎯 Interacción / juego
-"¿Quién es ese Pokémon?" — minijuego clásico. Sprite en silueta negra, 4 opciones, contador de aciertos/racha. Súper viciable.
-Comparador 1v1 — selecciona 2 Pokémon, ve sus stats lado a lado con barras superpuestas y quién gana en cada categoría.
-Constructor de equipo — arma tu equipo de 6, ve la suma de stats, gráfico radar de fortalezas/debilidades del equipo, qué tipos te cubren mal.
-Calculadora de daño — atacante vs defensor + movimiento → calcula el daño aproximado.
-Ruleta aleatoria — "dame 6 Pokémon al azar para un Nuzlocke", con filtros (solo de Kanto, solo de un tipo, etc.).
 💾 Persistencia (localStorage, sin backend)
 Favoritos ⭐ — botón de estrella en la tarjeta. Tab "Favoritos" en el header. Persisten entre sesiones.
 Historial "Vistos recientemente" — barrita lateral con los últimos 10 que viste.

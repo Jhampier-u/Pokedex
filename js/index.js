@@ -1149,16 +1149,16 @@ function switchMode(mode) {
   });
   const ids = {
     pokedex:"modePokedex", quiz:"modeQuiz", duel:"modeDuel",
-    team:"modeTeam", damage:"modeDamage", roulette:"modeRoulette",
+    team:"modeTeam", roulette:"modeRoulette",
   };
   Object.entries(ids).forEach(([m, id]) => {
-    document.getElementById(id).classList.toggle("hidden", m !== mode);
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle("hidden", m !== mode);
   });
   // Lazy init
   if (mode === "quiz"     && !TOOL_INITED.quiz)     initQuiz();
   if (mode === "duel"     && !TOOL_INITED.duel)     initDuel();
   if (mode === "team"     && !TOOL_INITED.team)     initTeam();
-  if (mode === "damage"   && !TOOL_INITED.damage)   initDamage();
   if (mode === "roulette" && !TOOL_INITED.roulette) initRoulette();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -1332,15 +1332,37 @@ function answerQuiz(picked) {
 }
 
 // ════════════════════════════════════════════════════════
-//  TOOL 2:  DUELO  1 v 1
+//  TOOL 2:  SIMULADOR DE BATALLA  (Duelo + Daño fusionados)
 // ════════════════════════════════════════════════════════
-const duelState = { A: null, B: null };
+const duelState = {
+  A: null, B: null,
+  level: 50,
+  moveA: null, moveB: null,
+};
 
 function initDuel() {
   TOOL_INITED.duel = true;
-  buildPicker($("duelPickerA"), data => { duelState.A = data; renderDuelPreview("A"); checkDuel(); });
-  buildPicker($("duelPickerB"), data => { duelState.B = data; renderDuelPreview("B"); checkDuel(); });
+  buildPicker($("duelPickerA"), async data => {
+    duelState.A = data; duelState.moveA = null;
+    renderDuelPreview("A");
+    await populateDuelMoves("A", data);
+    runBattle();
+  });
+  buildPicker($("duelPickerB"), async data => {
+    duelState.B = data; duelState.moveB = null;
+    renderDuelPreview("B");
+    await populateDuelMoves("B", data);
+    runBattle();
+  });
+  $("duelLvl").addEventListener("input", e => {
+    duelState.level = parseInt(e.target.value, 10);
+    $("duelLvlVal").textContent = duelState.level;
+    runBattle();
+  });
+  $("duelMoveA").addEventListener("change", e => onMoveSelect("A", e.target.value));
+  $("duelMoveB").addEventListener("change", e => onMoveSelect("B", e.target.value));
 }
+
 function renderDuelPreview(side) {
   const data = duelState[side];
   const target = $("duelPreview" + side);
@@ -1352,31 +1374,118 @@ function renderDuelPreview(side) {
       ${data.types.map(t => `<span class="type-badge type-${t.type.name}">${t.type.name.toUpperCase()}</span>`).join("")}
     </div>`;
 }
-function checkDuel() {
-  if (!duelState.A || !duelState.B) return;
-  renderDuelResults();
+
+async function populateDuelMoves(side, atk) {
+  const sel = $("duelMove" + side);
+  // Show first 30 moves of the Pokémon
+  sel.innerHTML = '<option value="">— Selecciona movimiento —</option>' +
+    atk.moves.slice(0, 30).map(m =>
+      `<option value="${m.move.name}">${prettyName(m.move.name)}</option>`
+    ).join("");
+  $("duelAtkLabel" + side).textContent = `${atk.name.toUpperCase()} → ${duelState[side === "A" ? "B" : "A"]?.name?.toUpperCase() || "..."}`;
 }
-function renderDuelResults() {
+
+async function onMoveSelect(side, moveName) {
+  if (!moveName) { duelState["move" + side] = null; runBattle(); return; }
+  let m = state.moveCache[moveName];
+  if (!m) {
+    try {
+      const r = await fetch(`https://pokeapi.co/api/v2/move/${moveName}`);
+      m = await r.json();
+      state.moveCache[moveName] = m;
+    } catch { return; }
+  }
+  duelState["move" + side] = m;
+  runBattle();
+}
+
+// ──── Actual stat at a given level (IV 31, EV 0, neutral nature) ────
+function actualStat(base, level, isHp = false) {
+  const iv = 31, ev = 0;
+  const numerator = (2 * base + iv + Math.floor(ev / 4)) * level;
+  if (isHp) return Math.floor(numerator / 100) + level + 10;
+  return Math.floor(numerator / 100) + 5;
+}
+function actualStatsFor(pokemon, level) {
+  const map = Object.fromEntries(pokemon.stats.map(s => [s.stat.name, s.base_stat]));
+  return {
+    hp:                actualStat(map.hp                || 0, level, true),
+    attack:            actualStat(map.attack            || 0, level),
+    defense:           actualStat(map.defense           || 0, level),
+    "special-attack":  actualStat(map["special-attack"] || 0, level),
+    "special-defense": actualStat(map["special-defense"]|| 0, level),
+    speed:             actualStat(map.speed             || 0, level),
+  };
+}
+
+// ──── Pure damage helper (used by battle + verdict) ────
+function calcDamage(atk, def, move, level) {
+  if (!move) return null;
+  const power = move.power || 0;
+  const cat   = move.damage_class?.name || "status";
+  if (power === 0 || cat === "status") {
+    return { isStatus: true, moveType: move.type?.name || "???" };
+  }
+  const moveType = move.type.name;
+  // Actual battle stats at the chosen level (assume IV 31, EV 0, neutral nature)
+  const atkStats = actualStatsFor(atk, level);
+  const defStats = actualStatsFor(def, level);
+  const A  = cat === "physical" ? atkStats["attack"]  : atkStats["special-attack"];
+  const D  = cat === "physical" ? defStats["defense"] : defStats["special-defense"];
+  const HP = defStats["hp"];
+  const atkTypes = atk.types.map(t => t.type.name);
+  const stab = atkTypes.includes(moveType) ? 1.5 : 1;
+  const defTypes = def.types.map(t => t.type.name);
+  let eff = 1;
+  defTypes.forEach(d => {
+    const x = TYPE_CHART[moveType] && TYPE_CHART[moveType][d];
+    if (x !== undefined) eff *= x;
+  });
+  const base = (((2 * level / 5 + 2) * power * A) / Math.max(D, 1)) / 50 + 2;
+  const min  = Math.floor(base * stab * eff * 0.85);
+  const max  = Math.floor(base * stab * eff * 1.0);
+  return { isStatus: false, moveType, cat, power, stab, eff, A, D, HP, min, max,
+           minPct: HP > 0 ? Math.min(100, (min/HP)*100) : 0,
+           maxPct: HP > 0 ? Math.min(100, (max/HP)*100) : 0 };
+}
+
+// ──── Main battle render pipeline ────
+function runBattle() {
   const A = duelState.A, B = duelState.B;
-  const results = $("duelResults");
-  results.classList.remove("hidden");
+  if (!A || !B) {
+    ["duelStatsSection","duelMatchupSection","duelAttackSection","duelVerdictSection","duelLevelBar"]
+      .forEach(id => $(id).classList.add("hidden"));
+    return;
+  }
+  // Show all sections
+  ["duelStatsSection","duelMatchupSection","duelAttackSection","duelVerdictSection","duelLevelBar"]
+    .forEach(id => $(id).classList.remove("hidden"));
 
-  let html = "";
-  let totalA = 0, totalB = 0;
+  // Refresh move labels (now both sides are known)
+  $("duelAtkLabelA").textContent = `${A.name.toUpperCase()} → ${B.name.toUpperCase()}`;
+  $("duelAtkLabelB").textContent = `${B.name.toUpperCase()} → ${A.name.toUpperCase()}`;
+
+  renderBattleStats(A, B);
+  renderBattleMatchup(A, B);
+  renderBattleAttack("A", A, B, duelState.moveA);
+  renderBattleAttack("B", B, A, duelState.moveB);
+  renderBattleVerdict(A, B);
+}
+
+function renderBattleStats(A, B) {
+  const body = $("duelStatsBody");
   const order = ["hp","attack","defense","special-attack","special-defense","speed"];
-  // map stat name → object
-  const sa = Object.fromEntries(A.stats.map(s => [s.stat.name, s.base_stat]));
-  const sb = Object.fromEntries(B.stats.map(s => [s.stat.name, s.base_stat]));
-
+  // Use actual stats at the current level so the slider has visible effect
+  const sa = actualStatsFor(A, duelState.level);
+  const sb = actualStatsFor(B, duelState.level);
+  let html = `<div class="duel-stats-note">Stats reales al nivel <strong>${duelState.level}</strong> (IV 31, EV 0, naturaleza neutra)</div>`;
+  let totalA = 0, totalB = 0;
   order.forEach(key => {
-    const va = sa[key] || 0;
-    const vb = sb[key] || 0;
+    const va = sa[key] || 0, vb = sb[key] || 0;
     totalA += va; totalB += vb;
     const max = Math.max(va, vb, 1);
-    const pa = (va / max) * 100;
-    const pb = (vb / max) * 100;
-    const wA = va > vb;
-    const wB = vb > va;
+    const pa = (va / max) * 100, pb = (vb / max) * 100;
+    const wA = va > vb, wB = vb > va;
     html += `
       <div class="duel-stat-row">
         <div class="duel-bar-side left ${wA ? "winner" : ""}">
@@ -1395,20 +1504,173 @@ function renderDuelResults() {
         </div>
       </div>`;
   });
-  // Totals
   html += `
     <div class="duel-totals">
       <div>
         <div class="duel-total-side ${totalA > totalB ? "winner" : ""}">${totalA}</div>
         <div class="duel-total-label">${A.name.toUpperCase()}</div>
       </div>
-      <div class="duel-total-label">TOTAL</div>
+      <div class="duel-total-label">TOTAL BASE</div>
       <div>
         <div class="duel-total-side ${totalB > totalA ? "winner" : ""}">${totalB}</div>
         <div class="duel-total-label">${B.name.toUpperCase()}</div>
       </div>
     </div>`;
-  results.innerHTML = html;
+  body.innerHTML = html;
+}
+
+function renderBattleMatchup(A, B) {
+  const body = $("duelMatchupBody");
+  // For each side, calc multipliers from THEIR types AS ATTACKER against opponent's types
+  function side(att, defender) {
+    const buckets = { x4:[], x2:[], x1:[], x05:[], x025:[], x0:[] };
+    att.types.forEach(t => {
+      const tn = t.type.name;
+      let mult = 1;
+      defender.types.forEach(d => {
+        const x = TYPE_CHART[tn] && TYPE_CHART[tn][d.type.name];
+        if (x !== undefined) mult *= x;
+      });
+      if (mult === 4) buckets.x4.push(tn);
+      else if (mult === 2) buckets.x2.push(tn);
+      else if (mult === 1) buckets.x1.push(tn);
+      else if (mult === 0.5) buckets.x05.push(tn);
+      else if (mult === 0.25) buckets.x025.push(tn);
+      else if (mult === 0) buckets.x0.push(tn);
+    });
+    return buckets;
+  }
+  const ab = side(A, B);
+  const ba = side(B, A);
+  const order = [["x4","×4"],["x2","×2"],["x1","×1"],["x05","×½"],["x025","×¼"],["x0","×0"]];
+  function render(buckets) {
+    return order.filter(([k]) => buckets[k].length > 0).map(([k, lbl]) => `
+      <div class="duel-matchup-row">
+        <div class="duel-matchup-mult ${k}">${lbl}</div>
+        <div class="duel-matchup-types-list">
+          ${buckets[k].map(t => `<span class="type-badge type-${t}">${t.toUpperCase()}</span>`).join("")}
+        </div>
+      </div>`).join("") || '<div class="duel-matchup-row"><span style="opacity:0.4;font-size:11px">Sin movimientos STAB con ventaja clara</span></div>';
+  }
+  body.innerHTML = `
+    <div class="duel-matchup-side">
+      <h4><span style="color:#ff8888">${A.name.toUpperCase()}</span> <span class="arrow">→</span> <span style="color:#88b0ff">${B.name.toUpperCase()}</span></h4>
+      ${render(ab)}
+    </div>
+    <div class="duel-matchup-side">
+      <h4><span style="color:#88b0ff">${B.name.toUpperCase()}</span> <span class="arrow">→</span> <span style="color:#ff8888">${A.name.toUpperCase()}</span></h4>
+      ${render(ba)}
+    </div>`;
+}
+
+function renderBattleAttack(side, atk, def, move) {
+  const target = $("duelDmg" + side);
+  if (!move) {
+    target.innerHTML = '<div class="das-empty">Selecciona un movimiento para calcular el daño</div>';
+    return;
+  }
+  const r = calcDamage(atk, def, move, duelState.level);
+  if (r.isStatus) {
+    target.innerHTML = `
+      <div class="das-headline">SIN DAÑO</div>
+      <div class="das-meta">
+        <span>${prettyName(move.name)}</span>
+        <span class="type-badge type-${r.moveType}">${r.moveType.toUpperCase()}</span>
+        <span>Movimiento de estado</span>
+      </div>`;
+    return;
+  }
+  let effLabel = "Daño normal", effClass = "";
+  if (r.eff >= 4)        { effLabel = `¡SUPER eficaz ×${r.eff}!`; effClass = "das-eff-super"; }
+  else if (r.eff >= 2)   { effLabel = `Muy eficaz ×${r.eff}`;       effClass = "das-eff-super"; }
+  else if (r.eff === 0)  { effLabel = `Sin efecto ×0`;              effClass = "das-eff-none"; }
+  else if (r.eff < 1)    { effLabel = `Poco eficaz ×${r.eff}`;      effClass = "das-eff-not"; }
+
+  const ko = r.minPct >= 100 ? "💀 K.O. SEGURO" : r.maxPct >= 100 ? "⚠ POSIBLE K.O." : "";
+
+  target.innerHTML = `
+    <div class="das-headline">${r.min} – ${r.max} HP</div>
+    <div class="das-bar">
+      <div class="das-bar-fill" style="width:${r.maxPct}%"></div>
+      <div class="das-bar-text">${r.minPct.toFixed(1)}% – ${r.maxPct.toFixed(1)}% del HP</div>
+    </div>
+    <div class="das-meta">
+      <span class="type-badge type-${r.moveType}">${r.moveType.toUpperCase()}</span>
+      <span>${prettyName(move.name)}</span>
+      <span>Pot. ${r.power}</span>
+      <span>${r.cat === "physical" ? "Físico" : "Especial"}</span>
+      ${r.stab === 1.5 ? '<span>STAB ×1.5</span>' : ''}
+      <span class="${effClass}">${effLabel}</span>
+    </div>
+    ${ko ? `<div class="das-ko">${ko}</div>` : ""}`;
+}
+
+function renderBattleVerdict(A, B) {
+  const body = $("duelVerdictBody");
+  // Actual stats at current level — same scaling for both sides, but feels right with the slider
+  const sa = actualStatsFor(A, duelState.level);
+  const sb = actualStatsFor(B, duelState.level);
+
+  // Speed
+  const speedWinner = sa.speed > sb.speed ? "A" : sa.speed < sb.speed ? "B" : "tie";
+  // Bulk (HP × avg(Def, SpDef))
+  const bulkA = sa.hp * (sa.defense + sa["special-defense"]) / 2;
+  const bulkB = sb.hp * (sb.defense + sb["special-defense"]) / 2;
+  const bulkWinner = bulkA > bulkB * 1.1 ? "A" : bulkB > bulkA * 1.1 ? "B" : "tie";
+  // Offense (max of Atk and SpAtk)
+  const offA = Math.max(sa.attack, sa["special-attack"]);
+  const offB = Math.max(sb.attack, sb["special-attack"]);
+  const offWinner = offA > offB * 1.1 ? "A" : offB > offA * 1.1 ? "B" : "tie";
+  // Type advantage: who has more super-effective options STAB
+  function countSuper(att, def) {
+    let n = 0;
+    att.types.forEach(t => {
+      let m = 1;
+      def.types.forEach(d => {
+        const x = TYPE_CHART[t.type.name] && TYPE_CHART[t.type.name][d.type.name];
+        if (x !== undefined) m *= x;
+      });
+      if (m >= 2) n++;
+    });
+    return n;
+  }
+  const supA = countSuper(A, B), supB = countSuper(B, A);
+  const typeWinner = supA > supB ? "A" : supB > supA ? "B" : "tie";
+
+  // Final verdict: weighted score
+  function score(side) {
+    let s = 0;
+    if (speedWinner === side) s += 1;
+    if (bulkWinner  === side) s += 2;
+    if (offWinner   === side) s += 2;
+    if (typeWinner  === side) s += 3;
+    return s;
+  }
+  const sA = score("A"), sB = score("B");
+  const finalWinner = sA > sB ? "A" : sB > sA ? "B" : "tie";
+
+  function cell(label, winner, detail) {
+    const cls  = winner === "tie" ? "tie" : "side-" + winner;
+    const name = winner === "tie" ? "EMPATE" : (winner === "A" ? A.name : B.name).toUpperCase();
+    return `
+      <div class="dv-cell">
+        <div class="dv-label">${label}</div>
+        <div class="dv-winner ${cls}">${name}</div>
+        <div class="dv-detail">${detail}</div>
+      </div>`;
+  }
+  body.innerHTML = `
+    ${cell("⚡ VELOCIDAD", speedWinner, `${sa.speed} vs ${sb.speed}`)}
+    ${cell("🛡️ AGUANTE", bulkWinner,  `${Math.round(bulkA)} vs ${Math.round(bulkB)} (HP × DEF)`)}
+    ${cell("⚔️ OFENSIVA", offWinner,  `${offA} vs ${offB} (mejor stat ofensivo)`)}
+    ${cell("🔥 VENTAJA DE TIPO", typeWinner, `${supA} vs ${supB} tipos super-eficaces`)}
+    <div class="dv-final">
+      <div class="dv-label">VEREDICTO FINAL</div>
+      <div class="dv-winner ${finalWinner === "tie" ? "tie" : "side-" + finalWinner}">
+        ${finalWinner === "tie" ? "🤝 COMBATE PAREJO" : "🏆 " + (finalWinner === "A" ? A.name : B.name).toUpperCase()}
+      </div>
+      <div class="dv-detail">Puntaje: ${sA} a ${sB} (basado en velocidad, aguante, ofensiva y tipos)</div>
+    </div>`;
 }
 
 // ════════════════════════════════════════════════════════
@@ -1489,22 +1751,20 @@ function renderTeamAnalysis() {
   if (teamState.members.length === 0) { wrap.classList.add("hidden"); return; }
   wrap.classList.remove("hidden");
 
-  // ── Average stats ──
-  const order = ["hp","attack","defense","special-attack","special-defense","speed"];
+  const members = teamState.members;
+  const order  = ["hp","attack","defense","special-attack","special-defense","speed"];
   const labels = ["HP","ATK","DEF","SP.ATK","SP.DEF","VEL"];
-  const sums = order.map(() => 0);
-  teamState.members.forEach(m => {
-    const sm = Object.fromEntries(m.stats.map(s => [s.stat.name, s.base_stat]));
-    order.forEach((k, i) => sums[i] += sm[k] || 0);
-  });
-  const avgs = sums.map(s => Math.round(s / teamState.members.length));
 
-  // ── Render radar ──
+  // Build per-member stat map
+  const memberStats = members.map(m => Object.fromEntries(m.stats.map(s => [s.stat.name, s.base_stat])));
+  const sums = order.map(() => 0);
+  members.forEach((m, i) => order.forEach((k, j) => sums[j] += memberStats[i][k] || 0));
+  const avgs = sums.map(s => Math.round(s / members.length));
+
+  // ════ 1) Radar ════
   const svg = $("teamRadar");
-  const cx = 140, cy = 140, r = 95;
-  const n = order.length;
+  const cx = 140, cy = 140, r = 95, n = order.length;
   let svgInner = "";
-  // Grid rings
   for (let ring = 1; ring <= 4; ring++) {
     const rr = r * ring / 4;
     const pts = Array.from({length: n}, (_, i) => {
@@ -1513,19 +1773,16 @@ function renderTeamAnalysis() {
     }).join(" ");
     svgInner += `<polygon class="radar-grid" points="${pts}"/>`;
   }
-  // Axes
   for (let i = 0; i < n; i++) {
     const a = -Math.PI / 2 + i * 2 * Math.PI / n;
     svgInner += `<line class="radar-axis" x1="${cx}" y1="${cy}" x2="${cx + r * Math.cos(a)}" y2="${cy + r * Math.sin(a)}"/>`;
   }
-  // Data polygon
   const pts = avgs.map((v, i) => {
     const a = -Math.PI / 2 + i * 2 * Math.PI / n;
-    const ratio = Math.min(v / 200, 1);   // scale up to 200 base stat
+    const ratio = Math.min(v / 200, 1);
     return `${cx + r * ratio * Math.cos(a)},${cy + r * ratio * Math.sin(a)}`;
   }).join(" ");
   svgInner += `<polygon class="radar-fill" points="${pts}"/>`;
-  // Labels
   labels.forEach((lbl, i) => {
     const a = -Math.PI / 2 + i * 2 * Math.PI / n;
     const lx = cx + (r + 22) * Math.cos(a);
@@ -1537,29 +1794,100 @@ function renderTeamAnalysis() {
   });
   svg.innerHTML = svgInner;
 
-  // ── Totals ──
-  const totalAvg = avgs.reduce((a,b)=>a+b,0);
-  const allStats = teamState.members.map(m => m.stats.reduce((a,s)=>a+s.base_stat,0));
-  const totalSum = allStats.reduce((a,b)=>a+b,0);
+  // Totals
+  const allStats = members.map(m => m.stats.reduce((a, s) => a + s.base_stat, 0));
+  const totalSum = allStats.reduce((a, b) => a + b, 0);
   $("teamTotals").innerHTML = `
-    <div class="team-tot-cell">
-      <span class="team-tot-label">PROMEDIO</span>
-      <span class="team-tot-val">${Math.round(totalSum / teamState.members.length)}</span>
-    </div>
-    <div class="team-tot-cell">
-      <span class="team-tot-label">TOTAL</span>
-      <span class="team-tot-val">${totalSum}</span>
-    </div>
-    <div class="team-tot-cell">
-      <span class="team-tot-label">MIEMBROS</span>
-      <span class="team-tot-val">${teamState.members.length}/6</span>
+    <div class="team-tot-cell"><span class="team-tot-label">PROMEDIO BST</span><span class="team-tot-val">${Math.round(totalSum / members.length)}</span></div>
+    <div class="team-tot-cell"><span class="team-tot-label">TOTAL</span><span class="team-tot-val">${totalSum}</span></div>
+    <div class="team-tot-cell"><span class="team-tot-label">MIEMBROS</span><span class="team-tot-val">${members.length}/6</span></div>`;
+
+  // ════ 2) Per-stat breakdown (best/worst per stat) ════
+  const detail = $("teamStatsDetail");
+  const STAT_GRADIENTS = ["stat-hp","stat-atk","stat-def","stat-spatk","stat-spdef","stat-speed"];
+  detail.innerHTML = order.map((key, i) => {
+    let bestI = 0, worstI = 0;
+    memberStats.forEach((s, idx) => {
+      if ((s[key] || 0) > (memberStats[bestI][key] || 0)) bestI = idx;
+      if ((s[key] || 0) < (memberStats[worstI][key] || 0)) worstI = idx;
+    });
+    const bestVal  = memberStats[bestI][key] || 0;
+    const worstVal = memberStats[worstI][key] || 0;
+    const avgVal   = avgs[i];
+    const widthPct = Math.min((avgVal / 200) * 100, 100);
+    const avgPct   = Math.min((avgVal / 255) * 100, 100);
+    return `
+      <div class="tsd-row">
+        <div class="tsd-stat-name">${labels[i]}</div>
+        <div class="tsd-bar">
+          <div class="tsd-bar-fill ${STAT_GRADIENTS[i]}" style="width:${widthPct}%"></div>
+          <div class="tsd-bar-avg" style="left:${avgPct}%" title="Promedio del equipo: ${avgVal}"></div>
+        </div>
+        <div class="tsd-info tsd-info-best">
+          <span class="tsd-info-label">↑ Mejor</span>
+          ${cap(members[bestI].name)} ${bestVal}
+        </div>
+        <div class="tsd-info tsd-info-worst">
+          <span class="tsd-info-label">↓ Peor</span>
+          ${cap(members[worstI].name)} ${worstVal}
+        </div>
+      </div>`;
+  }).join("");
+
+  // ════ 3) Roles & destacados ════
+  const roleTopBy = (statKey) => {
+    let best = 0;
+    memberStats.forEach((s, i) => { if ((s[statKey] || 0) > (memberStats[best][statKey] || 0)) best = i; });
+    return { idx: best, val: memberStats[best][statKey] || 0 };
+  };
+  const roleTopByFn = (fn) => {
+    let best = 0;
+    memberStats.forEach((s, i) => { if (fn(s) > fn(memberStats[best])) best = i; });
+    return { idx: best, val: fn(memberStats[best]) };
+  };
+  const fastest      = roleTopBy("speed");
+  const physAttacker = roleTopBy("attack");
+  const specAttacker = roleTopBy("special-attack");
+  const tank         = roleTopByFn(s => s.hp + s.defense + s["special-defense"]);
+  const speedTier    = members
+    .map((m, i) => ({ m, idx: i, sp: memberStats[i].speed || 0 }))
+    .sort((a, b) => b.sp - a.sp);
+
+  const roleCard = (icon, label, role) => `
+    <div class="tr-card">
+      <div class="tr-label">${icon} ${label}</div>
+      <div class="tr-pokemon">
+        <img src="${spriteFor(members[role.idx].id)}" alt=""/>
+        <div>
+          <div class="tr-pokemon-name">${members[role.idx].name}</div>
+          <div class="tr-pokemon-val">${role.val}</div>
+        </div>
+      </div>
+    </div>`;
+  $("teamRoles").innerHTML = `
+    ${roleCard("⚡", "MÁS RÁPIDO",      fastest)}
+    ${roleCard("⚔️", "MEJOR ATK FÍSICO", physAttacker)}
+    ${roleCard("✨", "MEJOR ATK ESPECIAL", specAttacker)}
+    ${roleCard("🛡️", "MEJOR TANQUE (HP+DEF+SP.DEF)", tank)}
+    <div class="tr-card" style="grid-column: span 2;">
+      <div class="tr-label">📊 ORDEN DE TURNOS POR VELOCIDAD</div>
+      <div class="tr-tier">
+        ${speedTier.map((s, i) => `
+          <div class="tr-tier-row">
+            <div style="display:flex;align-items:center;gap:8px">
+              <img src="${spriteFor(s.m.id)}" alt=""/>
+              <span class="name">${i+1}. ${s.m.name}</span>
+            </div>
+            <span class="val">${s.sp}</span>
+          </div>`).join("")}
+      </div>
     </div>`;
 
-  // ── Coverage / weaknesses ──
-  // For each attacking type, count how many team members have multiplier >= 2
-  const coverageCounts = {};
-  Object.keys(TYPE_CHART).forEach(t => coverageCounts[t] = 0);
-  teamState.members.forEach(m => {
+  // ════ 4) Defensive coverage per member ════
+  // For each attacking type, list members with their multiplier
+  const defcov = {};
+  Object.keys(TYPE_CHART).forEach(att => defcov[att] = []);
+  members.forEach(m => {
     const ts = m.types.map(t => t.type.name);
     Object.keys(TYPE_CHART).forEach(att => {
       let mult = 1;
@@ -1567,162 +1895,104 @@ function renderTeamAnalysis() {
         const x = TYPE_CHART[att][d];
         if (x !== undefined) mult *= x;
       });
-      if (mult >= 2) coverageCounts[att]++;
+      if (mult >= 2) defcov[att].push({ member: m, mult });
     });
   });
-  const sorted = Object.entries(coverageCounts).sort((a,b) => b[1] - a[1]);
-  $("teamCoverage").innerHTML = sorted.map(([type, count]) => {
-    const cls = count >= 3 ? "danger" : count === 2 ? "warn" : count === 1 ? "" : "safe";
-    return `<div class="tc-cell type-${type} ${cls}">
-      <span>${TYPE_LABELS_ES[type] || type.toUpperCase()}</span>
-      <span class="tc-count">${count}</span>
-    </div>`;
+  // Sort: types with most weak members first
+  const defSorted = Object.entries(defcov)
+    .sort((a, b) => b[1].length - a[1].length)
+    .filter(([_, arr]) => arr.length > 0);
+
+  if (defSorted.length === 0) {
+    $("teamDefCov").innerHTML = '<div class="tdc-empty">¡Tu equipo no tiene debilidades comunes! 💪</div>';
+  } else {
+    $("teamDefCov").innerHTML = defSorted.map(([type, arr]) => {
+      const cls = arr.length >= 3 ? "danger" : arr.length === 2 ? "warn" : "";
+      return `
+        <div class="tdc-card ${cls}">
+          <div class="tdc-card-header">
+            <span class="tdc-type-badge type-${type}">${TYPE_LABELS_ES[type] || type.toUpperCase()}</span>
+            <span class="tdc-count"><strong>${arr.length}</strong>/${members.length}</span>
+          </div>
+          <div class="tdc-members">
+            ${arr.map(({member, mult}) => `
+              <div class="tdc-member ${mult === 4 ? "x4" : "x2"}" title="${cap(member.name)}: ×${mult}">
+                <img src="${spriteFor(member.id)}" alt="${member.name}"/>
+                <span class="tdc-mult">×${mult}</span>
+              </div>`).join("")}
+          </div>
+        </div>`;
+    }).join("");
+  }
+
+  // ════ 5) Offensive coverage (STAB-based) ════
+  // For each defensive type, count how many members have a STAB type that's super-effective vs it
+  const offcov = {};
+  Object.keys(TYPE_CHART).forEach(d => offcov[d] = []);
+  members.forEach(m => {
+    const stabTypes = m.types.map(t => t.type.name);
+    Object.keys(TYPE_CHART).forEach(defType => {
+      // does any STAB type hit defType for >=2x?
+      let bestMult = 0;
+      stabTypes.forEach(att => {
+        const x = TYPE_CHART[att][defType];
+        const mult = x === undefined ? 1 : x;
+        if (mult > bestMult) bestMult = mult;
+      });
+      if (bestMult >= 2) offcov[defType].push(m);
+    });
+  });
+  $("teamOffCov").innerHTML = Object.keys(TYPE_CHART).map(t => {
+    const arr = offcov[t];
+    const cls = arr.length >= 1 ? "covered" : "uncovered";
+    return `
+      <div class="toc-cell type-${t} ${cls}">
+        <span>${TYPE_LABELS_ES[t] || t.toUpperCase()}</span>
+        <span class="toc-count">${arr.length}</span>
+        <div class="toc-by">
+          ${arr.slice(0, 6).map(m => `<img src="${spriteFor(m.id)}" alt="${m.name}" title="${m.name}"/>`).join("")}
+        </div>
+      </div>`;
   }).join("");
-}
 
-// ════════════════════════════════════════════════════════
-//  TOOL 4:  CALCULADORA DE DAÑO
-// ════════════════════════════════════════════════════════
-const dmgState = { atk: null, def: null, move: null, level: 50 };
-
-function initDamage() {
-  TOOL_INITED.damage = true;
-  buildPicker($("dmgPickerAtk"), async data => {
-    dmgState.atk = data;
-    dmgState.move = null;
-    renderDmgPreview("Atk", data);
-    await populateMoves(data);
-    runDamageCalc();
-  });
-  buildPicker($("dmgPickerDef"), data => {
-    dmgState.def = data;
-    renderDmgPreview("Def", data);
-    runDamageCalc();
-  });
-  $("dmgMoveSel").addEventListener("change", async e => {
-    const moveName = e.target.value;
-    if (!moveName) return;
-    let m = state.moveCache[moveName];
-    if (!m) {
-      try {
-        const r = await fetch(`https://pokeapi.co/api/v2/move/${moveName}`);
-        m = await r.json();
-        state.moveCache[moveName] = m;
-      } catch { return; }
-    }
-    dmgState.move = m;
-    runDamageCalc();
-  });
-  $("dmgLvl").addEventListener("input", e => {
-    dmgState.level = parseInt(e.target.value, 10);
-    $("dmgLvlVal").textContent = dmgState.level;
-    runDamageCalc();
-  });
-}
-
-function renderDmgPreview(side, data) {
-  const el = $("dmg" + side + "Preview");
-  if (!data) { el.innerHTML = '<span class="dmg-mini-empty">—</span>'; return; }
-  el.innerHTML = `
-    <img src="${spriteFor(data.id)}" alt=""/>
-    <div>
-      <div class="dmg-mini-name">${data.name}</div>
-      <div class="dmg-mini-types">
-        ${data.types.map(t => `<span class="type-badge type-${t.type.name}">${t.type.name.toUpperCase()}</span>`).join("")}
-      </div>
-    </div>`;
-}
-
-async function populateMoves(atk) {
-  const sel = $("dmgMoveSel");
-  sel.disabled = true;
-  sel.innerHTML = '<option>Cargando movimientos...</option>';
-
-  // Take first 30 moves with damage potential
-  const moves = atk.moves.slice(0, 30);
-  // We only have names; fetch them lazily WHEN selected. Just list them.
-  sel.innerHTML = '<option value="">— Selecciona movimiento —</option>' +
-    moves.map(m => `<option value="${m.move.name}">${prettyName(m.move.name)}</option>`).join("");
-  sel.disabled = false;
-}
-
-function runDamageCalc() {
-  const root = $("dmgResults");
-  if (!dmgState.atk || !dmgState.def || !dmgState.move) {
-    root.classList.add("hidden");
-    return;
+  // ════ 6) Synergy / alerts ════
+  const alerts = [];
+  // Speed
+  const fastestSp = memberStats[fastest.idx].speed;
+  if (fastestSp >= 110) alerts.push({ kind: "ok", icon: "⚡", text: `Buena velocidad: ${cap(members[fastest.idx].name)} (${fastestSp}) abrirá la mayoría de los combates.` });
+  else if (fastestSp < 75) alerts.push({ kind: "warn", icon: "🐢", text: `Equipo lento. El más rápido (${cap(members[fastest.idx].name)}, ${fastestSp}) suele atacar después.` });
+  // Mixed offense
+  const physBest = memberStats[physAttacker.idx].attack;
+  const specBest = memberStats[specAttacker.idx]["special-attack"];
+  if (Math.abs(physBest - specBest) < 25) alerts.push({ kind: "ok", icon: "🎯", text: `Ofensiva mixta sólida (${physBest} físico / ${specBest} especial) — difícil de muralizar.` });
+  else if (physBest > specBest + 50) alerts.push({ kind: "info", icon: "💪", text: `Equipo muy físico. Cuidado con muros físicos como Skarmory o Toxapex.` });
+  else if (specBest > physBest + 50) alerts.push({ kind: "info", icon: "✨", text: `Equipo muy especial. Cuidado con muros especiales como Blissey o Chansey.` });
+  // Critical type weakness
+  const worstDef = defSorted[0];
+  if (worstDef && worstDef[1].length >= 4) {
+    alerts.push({ kind: "bad", icon: "⚠️", text: `${TYPE_LABELS_ES[worstDef[0]]} es CRÍTICO: ${worstDef[1].length}/${members.length} miembros débiles. Considera revisar la composición.` });
+  } else if (worstDef && worstDef[1].length >= 3) {
+    alerts.push({ kind: "warn", icon: "⚠️", text: `Cuidado con tipo ${TYPE_LABELS_ES[worstDef[0]]}: ${worstDef[1].length} miembros débiles.` });
   }
-  root.classList.remove("hidden");
+  // Type diversity
+  const usedTypes = new Set();
+  members.forEach(m => m.types.forEach(t => usedTypes.add(t.type.name)));
+  if (usedTypes.size >= members.length * 1.5) alerts.push({ kind: "ok", icon: "🌈", text: `Buena diversidad de tipos (${usedTypes.size} tipos representados).` });
+  else if (usedTypes.size <= members.length) alerts.push({ kind: "warn", icon: "♻️", text: `Pocos tipos representados (${usedTypes.size}). Diversifica para mejor cobertura.` });
+  // Offensive coverage gaps
+  const uncovered = Object.entries(offcov).filter(([_, a]) => a.length === 0).map(([t]) => TYPE_LABELS_ES[t]);
+  if (uncovered.length === 0) alerts.push({ kind: "ok", icon: "🎯", text: "¡Cobertura ofensiva STAB perfecta! Tu equipo puede golpear con ventaja a todos los tipos." });
+  else if (uncovered.length <= 3) alerts.push({ kind: "info", icon: "🎯", text: `Sin ventaja STAB contra: ${uncovered.join(", ")}. Cubre con movimientos secundarios.` });
+  else alerts.push({ kind: "warn", icon: "🎯", text: `${uncovered.length} tipos sin cobertura ofensiva STAB. Considera Pokémon con más variedad de tipos.` });
+  // Full team
+  if (members.length === 6) alerts.push({ kind: "ok", icon: "✅", text: "Equipo completo. ¡Listo para la liga!" });
+  else alerts.push({ kind: "info", icon: "📦", text: `Equipo incompleto (${members.length}/6). Añade más miembros para análisis completo.` });
 
-  const atk = dmgState.atk, def = dmgState.def, move = dmgState.move, level = dmgState.level;
-
-  // Power & category
-  const power = move.power || 0;
-  const cat   = move.damage_class?.name || "status";
-
-  if (power === 0 || cat === "status") {
-    root.innerHTML = `
-      <div class="dmg-result-headline">SIN DAÑO DIRECTO</div>
-      <div class="dmg-eff-line eff-normal">El movimiento "${prettyName(move.name)}" no inflige daño directo (movimiento de estado o sin potencia base).</div>`;
-    return;
-  }
-
-  const moveType = move.type.name;
-
-  // Get attacker stat
-  const atkStats = Object.fromEntries(atk.stats.map(s => [s.stat.name, s.base_stat]));
-  const defStats = Object.fromEntries(def.stats.map(s => [s.stat.name, s.base_stat]));
-
-  const A = cat === "physical" ? atkStats["attack"]  : atkStats["special-attack"];
-  const D = cat === "physical" ? defStats["defense"] : defStats["special-defense"];
-  const HP = defStats["hp"];
-
-  // STAB
-  const atkTypes = atk.types.map(t => t.type.name);
-  const stab = atkTypes.includes(moveType) ? 1.5 : 1;
-
-  // Effectiveness
-  const defTypes = def.types.map(t => t.type.name);
-  let eff = 1;
-  defTypes.forEach(d => {
-    const x = TYPE_CHART[moveType] && TYPE_CHART[moveType][d];
-    if (x !== undefined) eff *= x;
-  });
-
-  // Base damage formula (Gen V+):
-  //   ((2*L/5 + 2) * Power * A / D) / 50 + 2
-  const base = (((2 * level / 5 + 2) * power * A) / Math.max(D, 1)) / 50 + 2;
-  const min  = Math.floor(base * stab * eff * 0.85);
-  const max  = Math.floor(base * stab * eff * 1.0);
-
-  const minPct = HP > 0 ? Math.min(100, (min / HP) * 100) : 0;
-  const maxPct = HP > 0 ? Math.min(100, (max / HP) * 100) : 0;
-
-  let effLabel = "Efectividad normal (×1)", effClass = "eff-normal";
-  if (eff >= 4)        { effLabel = `¡SUPER eficaz! (×${eff})`;   effClass = "eff-super"; }
-  else if (eff >= 2)   { effLabel = `Es muy eficaz (×${eff})`;     effClass = "eff-super"; }
-  else if (eff === 0)  { effLabel = "No tiene ningún efecto (×0)"; effClass = "eff-none"; }
-  else if (eff < 1)    { effLabel = `No es muy eficaz (×${eff})`;  effClass = "eff-not"; }
-
-  const headline = eff === 0 ? "0 HP" : `${min} – ${max} HP`;
-  const pctLine  = eff === 0 ? "" : `(${minPct.toFixed(1)}% – ${maxPct.toFixed(1)}% del HP del defensor)`;
-
-  root.innerHTML = `
-    <div class="dmg-result-headline">${headline}</div>
-    <div class="dmg-eff-line ${effClass}">${effLabel}</div>
-    ${eff === 0 ? "" : `
-      <div class="dmg-range-bar">
-        <div class="dmg-range-fill" style="width:${maxPct}%"></div>
-        <div class="dmg-range-text">${pctLine}</div>
-      </div>`}
-    <div class="dmg-breakdown">
-      <div class="dmg-row"><span>Potencia</span><span>${power}</span></div>
-      <div class="dmg-row"><span>Categoría</span><span>${cat === "physical" ? "FÍSICO" : "ESPECIAL"}</span></div>
-      <div class="dmg-row"><span>Tipo</span><span>${moveType.toUpperCase()}</span></div>
-      <div class="dmg-row"><span>STAB</span><span>${stab === 1.5 ? "×1.5" : "—"}</span></div>
-      <div class="dmg-row"><span>${cat === "physical" ? "ATK atacante" : "SP.ATK atacante"}</span><span>${A}</span></div>
-      <div class="dmg-row"><span>${cat === "physical" ? "DEF defensor" : "SP.DEF defensor"}</span><span>${D}</span></div>
-    </div>`;
+  $("teamSynergy").innerHTML = alerts.map(a => `
+    <div class="ts-row ${a.kind}">
+      <span class="ts-icon">${a.icon}</span>
+      <span>${a.text}</span>
+    </div>`).join("");
 }
 
 // ════════════════════════════════════════════════════════

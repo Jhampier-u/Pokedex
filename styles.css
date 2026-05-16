@@ -2501,3 +2501,554 @@ kbd {
   .quiz-silhouette { width: 180px; height: 180px; }
   .team-slots { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* ══════════════════════════════════════
+   BATTLE  SIMULATOR  (replaces old duel)
+══════════════════════════════════════ */
+.duel-section {
+  background: linear-gradient(180deg, #131313, #0a0a0a);
+  border: 3px solid var(--darker);
+  border-radius: 12px;
+  padding: 22px 26px;
+  margin-bottom: 20px;
+}
+.duel-section-title {
+  font-family: nintendo-DS;
+  font-size: 15px;
+  color: var(--yellow);
+  letter-spacing: 4px;
+  border-bottom: 2px solid #2a2a2a;
+  padding-bottom: 10px;
+  margin-bottom: 16px;
+}
+
+/* Level slider for the whole battle */
+.duel-level-bar {
+  background: #111;
+  border: 3px solid var(--darker);
+  border-radius: 10px;
+  padding: 16px 22px;
+  margin-bottom: 20px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 18px;
+  align-items: center;
+}
+.duel-level-bar label {
+  font-family: nintendo-DS;
+  font-size: 13px;
+  color: var(--yellow);
+  letter-spacing: 2px;
+  white-space: nowrap;
+}
+.duel-level-bar label span { color: var(--cream); margin-left: 6px; }
+
+/* Stats body (re-uses the old duel-stat-row from before) */
+.duel-stats-body { display: flex; flex-direction: column; gap: 8px; }
+.duel-stats-note {
+  font-family: nintendo-DS;
+  font-size: 11px;
+  color: rgba(255,248,231,0.55);
+  letter-spacing: 1px;
+  text-align: center;
+  padding-bottom: 10px;
+  margin-bottom: 4px;
+  border-bottom: 1px dashed #2a2a2a;
+}
+.duel-stats-note strong { color: var(--yellow); }
+
+/* Type matchup grid: A→B and B→A side by side */
+.duel-matchup-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.duel-matchup-side {
+  background: #0d0d0d;
+  border: 2px solid #222;
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+.duel-matchup-side h4 {
+  font-family: nintendo-DS;
+  font-size: 12px;
+  color: var(--yellow);
+  letter-spacing: 2px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.duel-matchup-side h4 .arrow { color: var(--cream); opacity: 0.5; }
+.duel-matchup-row {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px dashed #1f1f1f;
+  font-family: nintendo-DS;
+  font-size: 12px;
+}
+.duel-matchup-row:last-child { border-bottom: none; }
+.duel-matchup-mult {
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+.duel-matchup-mult.x4   { color: #ff5555; text-shadow: 0 0 6px rgba(255,80,80,0.5); }
+.duel-matchup-mult.x2   { color: #ff9999; }
+.duel-matchup-mult.x1   { color: rgba(255,248,231,0.5); }
+.duel-matchup-mult.x05  { color: #99ff99; }
+.duel-matchup-mult.x025 { color: #66ff66; text-shadow: 0 0 6px rgba(80,255,80,0.5); }
+.duel-matchup-mult.x0   { color: #888; }
+.duel-matchup-types-list {
+  display: flex; flex-wrap: wrap; gap: 5px;
+}
+.duel-matchup-types-list .type-badge {
+  font-size: 10px; padding: 3px 9px; letter-spacing: 0.5px;
+}
+
+/* Attack simulator (A↔B) */
+.duel-attack-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.duel-attack-side {
+  background: #0d0d0d;
+  border: 2px solid #222;
+  border-radius: 8px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.duel-attack-side[data-side="A"] { border-left: 4px solid #ff7070; }
+.duel-attack-side[data-side="B"] { border-left: 4px solid #88B0FF; }
+.das-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.das-arrow {
+  font-family: nintendo-DS;
+  font-size: 18px;
+  color: var(--yellow);
+  letter-spacing: 3px;
+}
+.das-sub {
+  font-size: 11px;
+  color: rgba(255,248,231,0.5);
+  letter-spacing: 1px;
+  text-transform: capitalize;
+}
+.das-result {
+  background: #0a0a0a;
+  border: 2px solid #2a2a2a;
+  border-radius: 6px;
+  padding: 14px;
+  min-height: 90px;
+}
+.das-empty {
+  font-size: 12px;
+  color: rgba(255,248,231,0.35);
+  letter-spacing: 1px;
+  text-align: center;
+  padding-top: 16px;
+}
+.das-headline {
+  font-family: poke-solid;
+  font-size: 24px;
+  color: var(--yellow);
+  letter-spacing: 2px;
+  text-shadow: 2px 2px 0 rgba(0,0,0,0.5);
+  margin-bottom: 6px;
+}
+.das-bar {
+  height: 18px;
+  background: #161616;
+  border: 2px solid #222;
+  border-radius: 4px;
+  position: relative;
+  overflow: hidden;
+  margin: 8px 0;
+}
+.das-bar-fill {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, #FFD700, #FF6030);
+  width: 0;
+  transition: width 0.5s ease;
+}
+.das-bar-text {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-family: nintendo-DS;
+  font-size: 12px;
+  color: white;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
+  letter-spacing: 1px;
+}
+.das-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-family: nintendo-DS;
+  font-size: 10px;
+  color: rgba(255,248,231,0.6);
+  letter-spacing: 1px;
+  margin-top: 4px;
+}
+.das-meta span {
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  padding: 3px 8px;
+  border-radius: 3px;
+}
+.das-meta .das-eff-super  { border-color: #44dd44; color: #aaffaa; }
+.das-meta .das-eff-not    { border-color: #aa6644; color: #ffaa88; }
+.das-meta .das-eff-none   { border-color: #666; color: #aaa; }
+.das-ko {
+  font-family: poke-solid;
+  font-size: 14px;
+  color: #ff5555;
+  letter-spacing: 2px;
+  text-align: center;
+  margin-top: 6px;
+  text-shadow: 0 0 8px rgba(255,80,80,0.5);
+}
+
+/* Verdict */
+.duel-verdict-body {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+.dv-cell {
+  background: #0d0d0d;
+  border: 2px solid #2a2a2a;
+  border-radius: 6px;
+  padding: 14px;
+  text-align: center;
+}
+.dv-label {
+  font-family: nintendo-DS;
+  font-size: 11px;
+  color: rgba(255,248,231,0.5);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+.dv-winner {
+  font-family: poke-solid;
+  font-size: 18px;
+  margin-top: 8px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.dv-winner.side-A { color: #ff8888; text-shadow: 2px 2px 0 rgba(0,0,0,0.5); }
+.dv-winner.side-B { color: #88b0ff; text-shadow: 2px 2px 0 rgba(0,0,0,0.5); }
+.dv-winner.tie    { color: var(--cream); opacity: 0.7; }
+.dv-detail {
+  font-size: 11px;
+  color: rgba(255,248,231,0.5);
+  letter-spacing: 0.5px;
+  margin-top: 4px;
+}
+.dv-final {
+  grid-column: 1 / -1;
+  background: linear-gradient(180deg, #161616, #0a0a0a);
+  border: 3px solid var(--yellow);
+  border-radius: 8px;
+  padding: 20px;
+  text-align: center;
+  box-shadow: 0 0 24px rgba(255,215,0,0.18);
+}
+.dv-final .dv-label { font-size: 13px; }
+.dv-final .dv-winner { font-size: 32px; margin-top: 10px; }
+
+/* ══════════════════════════════════════
+   TEAM  ANALYSIS  (expanded)
+══════════════════════════════════════ */
+.team-section {
+  background: linear-gradient(180deg, #131313, #0a0a0a);
+  border: 3px solid var(--darker);
+  border-radius: 12px;
+  padding: 22px 26px;
+  margin-bottom: 20px;
+}
+
+/* Stats: radar + per-stat detail */
+.team-stats-layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+.team-radar-area { display: flex; flex-direction: column; align-items: center; }
+.team-stats-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tsd-row {
+  display: grid;
+  grid-template-columns: 70px 1fr 130px 130px;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  background: #0d0d0d;
+  border: 1px solid #1f1f1f;
+  border-radius: 5px;
+  font-family: nintendo-DS;
+}
+.tsd-stat-name {
+  font-size: 13px;
+  color: var(--yellow);
+  letter-spacing: 1px;
+  text-align: right;
+}
+.tsd-bar {
+  position: relative;
+  height: 14px;
+  background: #161616;
+  border: 1px solid #2a2a2a;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.tsd-bar-fill {
+  position: absolute; inset: 0;
+  border-radius: 4px;
+  width: 0;
+  transition: width 0.5s ease;
+}
+.tsd-bar-avg {
+  position: absolute; top: 0; bottom: 0;
+  width: 2px;
+  background: rgba(255,255,255,0.6);
+  z-index: 2;
+  pointer-events: none;
+}
+.tsd-info {
+  font-size: 11px;
+  color: rgba(255,248,231,0.7);
+  text-align: right;
+  letter-spacing: 0.5px;
+}
+.tsd-info .tsd-info-label { color: rgba(255,248,231,0.4); margin-right: 4px; }
+.tsd-info-best  { color: #88FF88 !important; }
+.tsd-info-worst { color: #FF9999 !important; }
+
+/* Roles */
+.team-roles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+.tr-card {
+  background: #0d0d0d;
+  border: 2px solid #2a2a2a;
+  border-radius: 6px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tr-icon { font-size: 18px; }
+.tr-label {
+  font-family: nintendo-DS;
+  font-size: 11px;
+  color: rgba(255,248,231,0.55);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+.tr-pokemon {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.tr-pokemon img {
+  width: 48px; height: 48px;
+  image-rendering: pixelated;
+}
+.tr-pokemon-name {
+  font-family: nintendo-DS;
+  font-size: 14px;
+  color: var(--yellow);
+  text-transform: capitalize;
+  letter-spacing: 0.5px;
+}
+.tr-pokemon-val {
+  font-size: 11px;
+  color: rgba(255,248,231,0.55);
+  letter-spacing: 1px;
+}
+.tr-tier {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+.tr-tier-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 8px;
+  background: #161616;
+  border-radius: 3px;
+  font-size: 11px;
+  font-family: nintendo-DS;
+}
+.tr-tier-row img { width: 24px; height: 24px; image-rendering: pixelated; }
+.tr-tier-row .name { text-transform: capitalize; color: var(--cream); letter-spacing: 0.5px; }
+.tr-tier-row .val  { color: var(--yellow); }
+
+/* Defensive coverage with member sprites */
+.team-defcov {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+.tdc-card {
+  background: #0d0d0d;
+  border: 2px solid #2a2a2a;
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+.tdc-card.danger     { border-color: #ff4444; box-shadow: 0 0 12px rgba(255,80,80,0.25); }
+.tdc-card.warn       { border-color: #ffaa44; }
+.tdc-card.safe       { opacity: 0.6; }
+.tdc-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.tdc-type-badge {
+  font-family: nintendo-DS;
+  font-size: 11px;
+  color: white;
+  padding: 4px 10px;
+  border-radius: 3px;
+  letter-spacing: 1px;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.6);
+}
+.tdc-count {
+  margin-left: auto;
+  font-family: nintendo-DS;
+  font-size: 11px;
+  color: rgba(255,248,231,0.6);
+  letter-spacing: 1px;
+}
+.tdc-count strong { color: var(--yellow); }
+.tdc-members {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tdc-member {
+  position: relative;
+  background: #161616;
+  border: 2px solid #2a2a2a;
+  border-radius: 4px;
+  padding: 4px;
+  cursor: help;
+  transition: all 0.12s;
+}
+.tdc-member.x4 { border-color: #ff5555; box-shadow: 0 0 6px rgba(255,80,80,0.4); }
+.tdc-member.x2 { border-color: rgba(255,150,80,0.5); }
+.tdc-member:hover { transform: translateY(-2px); border-color: var(--yellow); }
+.tdc-member img { width: 36px; height: 36px; image-rendering: pixelated; display: block; }
+.tdc-member .tdc-mult {
+  position: absolute;
+  bottom: -4px; right: -4px;
+  background: #1a1a1a;
+  border: 2px solid currentColor;
+  border-radius: 8px;
+  padding: 0 4px;
+  font-family: nintendo-DS;
+  font-size: 9px;
+  letter-spacing: 0.5px;
+}
+.tdc-member.x4 .tdc-mult { color: #ff5555; }
+.tdc-member.x2 .tdc-mult { color: #ffaa55; }
+.tdc-empty {
+  text-align: center;
+  padding: 16px;
+  color: rgba(255,248,231,0.3);
+  font-size: 12px;
+  letter-spacing: 1px;
+  grid-column: 1 / -1;
+}
+
+/* Offensive coverage */
+.team-offcov {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 8px;
+}
+.toc-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 6px;
+  border-radius: 5px;
+  font-family: nintendo-DS;
+  font-size: 10px;
+  color: white;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.6);
+  letter-spacing: 1px;
+  position: relative;
+  text-transform: uppercase;
+}
+.toc-cell.covered     { box-shadow: 0 0 0 2px var(--yellow), 0 0 12px rgba(255,215,0,0.3); }
+.toc-cell.uncovered   { opacity: 0.35; }
+.toc-count {
+  font-size: 16px;
+  font-weight: 700;
+  margin-top: 4px;
+}
+.toc-by {
+  display: flex;
+  gap: 3px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.toc-by img { width: 22px; height: 22px; image-rendering: pixelated; }
+
+/* Synergy / alerts */
+.team-synergy {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ts-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: #0d0d0d;
+  border: 2px solid #2a2a2a;
+  border-radius: 6px;
+  font-family: nintendo-DS;
+  font-size: 13px;
+  letter-spacing: 0.5px;
+}
+.ts-row.ok    { border-left: 4px solid #44dd44; color: #aaffaa; }
+.ts-row.warn  { border-left: 4px solid #ffaa44; color: #ffd5aa; }
+.ts-row.bad   { border-left: 4px solid #ff5555; color: #ffaaaa; }
+.ts-row.info  { border-left: 4px solid #88B0FF; color: #c5d8ff; }
+.ts-icon { font-size: 18px; }
+
+/* ══════════════════════════════════════
+   RESPONSIVE for new sections
+══════════════════════════════════════ */
+@media (max-width: 900px) {
+  .duel-matchup-grid,
+  .duel-attack-grid,
+  .team-stats-layout { grid-template-columns: 1fr; }
+  .team-stats-layout .team-radar-area { max-width: 320px; margin: 0 auto; }
+  .tsd-row { grid-template-columns: 60px 1fr 100px; }
+  .tsd-row .tsd-info-worst { display: none; }
+}

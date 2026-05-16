@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -c \"C:\\\\Users\\\\USUARIO\\\\Downloads\\\\Pokemon-research-main\\\\Pokemon-research-main\\\\js\\\\index.js\")"
+    ]
+  }
+}

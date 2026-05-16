@@ -87,9 +87,8 @@
     <nav class="mode-switcher" id="modeSwitcher">
       <button class="mode-tab active" data-mode="pokedex">📖 <span>POKÉDEX</span></button>
       <button class="mode-tab" data-mode="quiz">❓ <span>¿QUIÉN ES?</span></button>
-      <button class="mode-tab" data-mode="duel">⚔️ <span>DUELO 1v1</span></button>
+      <button class="mode-tab" data-mode="duel">⚔️ <span>BATALLA</span></button>
       <button class="mode-tab" data-mode="team">🛡️ <span>EQUIPO</span></button>
-      <button class="mode-tab" data-mode="damage">💥 <span>DAÑO</span></button>
       <button class="mode-tab" data-mode="roulette">🎲 <span>RULETA</span></button>
     </nav>
 
@@ -371,10 +370,13 @@
       </section>
 
       <!-- ═══════════════════════════════
-           MODE: DUELO  1 v 1
+           MODE: SIMULADOR DE BATALLA
       ═══════════════════════════════ -->
       <section class="mode-view hidden" id="modeDuel">
         <div class="duel-wrap">
+          <h2 class="tool-title">⚔️ SIMULADOR DE BATALLA</h2>
+          <p class="tool-subtitle">Comparación completa, tipos, daño en ambas direcciones y pronóstico</p>
+
           <div class="duel-pickers">
             <div class="duel-slot" data-side="A">
               <div class="duel-slot-label">CONTENDIENTE A</div>
@@ -392,7 +394,52 @@
               </div>
             </div>
           </div>
-          <div class="duel-results hidden" id="duelResults"></div>
+
+          <div class="duel-level-bar hidden" id="duelLevelBar">
+            <label>NIVEL DE COMBATE: <span id="duelLvlVal">50</span></label>
+            <input type="range" id="duelLvl" min="1" max="100" value="50" class="dmg-lvl"/>
+          </div>
+
+          <!-- Section: stats comparison -->
+          <div class="duel-section hidden" id="duelStatsSection">
+            <div class="duel-section-title">◆ COMPARACIÓN DE ESTADÍSTICAS</div>
+            <div class="duel-stats-body" id="duelStatsBody"></div>
+          </div>
+
+          <!-- Section: type matchup -->
+          <div class="duel-section hidden" id="duelMatchupSection">
+            <div class="duel-section-title">◆ VENTAJA DE TIPO</div>
+            <div class="duel-matchup-grid" id="duelMatchupBody"></div>
+          </div>
+
+          <!-- Section: attack simulator -->
+          <div class="duel-section hidden" id="duelAttackSection">
+            <div class="duel-section-title">◆ SIMULADOR DE ATAQUE</div>
+            <div class="duel-attack-grid">
+              <div class="duel-attack-side" data-side="A">
+                <div class="das-header">
+                  <span class="das-arrow">A → B</span>
+                  <span class="das-sub" id="duelAtkLabelA">Movimiento de A</span>
+                </div>
+                <select class="dmg-move-sel" id="duelMoveA"></select>
+                <div class="das-result" id="duelDmgA"></div>
+              </div>
+              <div class="duel-attack-side" data-side="B">
+                <div class="das-header">
+                  <span class="das-arrow">B → A</span>
+                  <span class="das-sub" id="duelAtkLabelB">Movimiento de B</span>
+                </div>
+                <select class="dmg-move-sel" id="duelMoveB"></select>
+                <div class="das-result" id="duelDmgB"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section: verdict -->
+          <div class="duel-section hidden" id="duelVerdictSection">
+            <div class="duel-section-title">◆ PRONÓSTICO</div>
+            <div class="duel-verdict-body" id="duelVerdictBody"></div>
+          </div>
         </div>
       </section>
 
@@ -409,50 +456,48 @@
             </div>
           </div>
           <div class="team-slots" id="teamSlots"></div>
-          <div class="team-analysis hidden" id="teamAnalysis">
-            <div class="team-radar-wrap">
-              <div class="ta-section-title">◆ STATS PROMEDIO</div>
-              <svg class="team-radar" id="teamRadar" viewBox="0 0 280 280"></svg>
-              <div class="team-totals" id="teamTotals"></div>
-            </div>
-            <div class="team-coverage-wrap">
-              <div class="ta-section-title">◆ DEBILIDADES DEL EQUIPO</div>
-              <p class="ta-help">Cuántos miembros son débiles a cada tipo (×2 o ×4)</p>
-              <div class="team-coverage" id="teamCoverage"></div>
-            </div>
-          </div>
-        </div>
-      </section>
 
-      <!-- ═══════════════════════════════
-           MODE: CALCULADORA DE DAÑO
-      ═══════════════════════════════ -->
-      <section class="mode-view hidden" id="modeDamage">
-        <div class="dmg-wrap">
-          <h2 class="tool-title">💥 CALCULADORA DE DAÑO</h2>
-          <div class="dmg-form">
-            <div class="dmg-field">
-              <label>ATACANTE</label>
-              <div class="pkm-picker" id="dmgPickerAtk"></div>
-              <div class="dmg-mini-preview" id="dmgAtkPreview"></div>
+          <div class="team-analysis hidden" id="teamAnalysis">
+
+            <!-- Stats: radar + per-stat breakdown -->
+            <div class="team-section">
+              <div class="ta-section-title">◆ ESTADÍSTICAS DEL EQUIPO</div>
+              <div class="team-stats-layout">
+                <div class="team-radar-area">
+                  <svg class="team-radar" id="teamRadar" viewBox="0 0 280 280"></svg>
+                  <div class="team-totals" id="teamTotals"></div>
+                </div>
+                <div class="team-stats-detail" id="teamStatsDetail"></div>
+              </div>
             </div>
-            <div class="dmg-field">
-              <label>DEFENSOR</label>
-              <div class="pkm-picker" id="dmgPickerDef"></div>
-              <div class="dmg-mini-preview" id="dmgDefPreview"></div>
+
+            <!-- Roles & speed tier -->
+            <div class="team-section">
+              <div class="ta-section-title">◆ ROLES Y DESTACADOS</div>
+              <div class="team-roles" id="teamRoles"></div>
             </div>
-            <div class="dmg-field">
-              <label>MOVIMIENTO</label>
-              <select class="dmg-move-sel" id="dmgMoveSel" disabled>
-                <option>Selecciona el atacante primero</option>
-              </select>
+
+            <!-- Defensive coverage with per-member detail -->
+            <div class="team-section">
+              <div class="ta-section-title">◆ DEBILIDADES DEFENSIVAS POR MIEMBRO</div>
+              <p class="ta-help">Quién del equipo es débil a cada tipo (×2 o ×4). Pasa el cursor por encima de un sprite para ver el multiplicador exacto.</p>
+              <div class="team-defcov" id="teamDefCov"></div>
             </div>
-            <div class="dmg-field">
-              <label>NIVEL <span id="dmgLvlVal">50</span></label>
-              <input type="range" min="1" max="100" value="50" class="dmg-lvl" id="dmgLvl"/>
+
+            <!-- Offensive coverage -->
+            <div class="team-section">
+              <div class="ta-section-title">◆ COBERTURA OFENSIVA (STAB)</div>
+              <p class="ta-help">Tipos rivales que tu equipo puede golpear con bonificación de tipo (STAB). Más miembros cubriendo el mismo tipo = más opciones contra él.</p>
+              <div class="team-offcov" id="teamOffCov"></div>
             </div>
+
+            <!-- Synergy summary -->
+            <div class="team-section">
+              <div class="ta-section-title">◆ SINERGIA Y ALERTAS</div>
+              <div class="team-synergy" id="teamSynergy"></div>
+            </div>
+
           </div>
-          <div class="dmg-results hidden" id="dmgResults"></div>
         </div>
       </section>
 
