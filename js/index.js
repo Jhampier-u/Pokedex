@@ -439,6 +439,67 @@ pagBack10.addEventListener("click",() => navigate(-10));
 pagFwd10.addEventListener("click", () => navigate(+10));
 randomBtn.addEventListener("click", navigateRandom);
 
+// ── Touch swipe on the stage carousel ───────────────────
+// On mobile, drag horizontally with your finger to navigate.
+// Vertical movement still scrolls the page normally.
+(function setupSwipe() {
+  const target = document.querySelector(".stage-section");
+  if (!target) return;
+  let startX = null, startY = null, locked = null, baseIdx = 0;
+  const stepPx = 90;     // how many px = 1 navigation step
+  const minSwipe = 35;   // minimum movement before we treat it as a swipe
+
+  target.addEventListener("touchstart", e => {
+    if (e.touches.length !== 1) return;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    locked = null;       // not yet decided: horizontal vs vertical
+    baseIdx = state.current;
+  }, { passive: true });
+
+  target.addEventListener("touchmove", e => {
+    if (startX === null) return;
+    const dx = e.touches[0].clientX - startX;
+    const dy = e.touches[0].clientY - startY;
+
+    // First few px decide whether this gesture is a horizontal swipe
+    if (locked === null) {
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      locked = Math.abs(dx) > Math.abs(dy) ? "h" : "v";
+    }
+    if (locked === "v") return;     // let the page scroll normally
+
+    // Horizontal: prevent page side-scroll / iOS back gesture
+    e.preventDefault();
+
+    // Live navigation: step by 90px chunks while dragging
+    const steps = Math.trunc(-dx / stepPx);    // dx<0 → swipe left → next
+    const target2 = baseIdx + steps;
+    if (target2 !== state.current &&
+        target2 >= 0 && target2 < state.filtered.length) {
+      state.current = target2;
+      state.currentVariety = null;
+      renderStage();
+      scheduleDetailLoad();
+    }
+  }, { passive: false });
+
+  target.addEventListener("touchend", e => {
+    if (startX === null) return;
+    // If we never crossed a 'step' but moved enough, do a final ±1 navigation
+    if (locked === "h") {
+      const dx = (e.changedTouches[0].clientX) - startX;
+      if (state.current === baseIdx && Math.abs(dx) >= minSwipe) {
+        navigate(dx < 0 ? +1 : -1);
+      }
+    }
+    startX = startY = null; locked = null;
+  });
+  target.addEventListener("touchcancel", () => {
+    startX = startY = null; locked = null;
+  });
+})();
+
 filterType.addEventListener("change",   () => applyFilters({ resetIndex: true }));
 filterRegion.addEventListener("change", () => applyFilters({ resetIndex: true }));
 filterSort.addEventListener("change",   () => applyFilters({ resetIndex: true }));

@@ -406,6 +406,9 @@ body {
   padding: 30px 60px 24px;
   min-height: 380px;
   overflow: hidden;
+  touch-action: pan-y;       /* let the browser do vertical scroll only */
+  user-select: none;         /* avoid text-select wobble while dragging */
+  -webkit-user-select: none;
 }
 
 /* dynamic aura tinted by current Pokémon's type */
