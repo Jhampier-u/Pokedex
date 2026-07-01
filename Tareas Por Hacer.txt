@@ -1,12 +1,13 @@
 💾 Persistencia (localStorage, sin backend)
-Favoritos ⭐ — botón de estrella en la tarjeta. Tab "Favoritos" en el header. Persisten entre sesiones.
-Historial "Vistos recientemente" — barrita lateral con los últimos 10 que viste.
-"Capturados" / Pokédex personal — checkbox tipo "lo tengo" (como en Pokémon Home). Contador "350/1025 capturados" con barra de progreso por región.
-Notas personales — pequeño textarea por Pokémon ("este lo usé en mi run de Esmeralda").
+[✅] Favoritos ⭐ — botón de estrella (FAV) en la tarjeta + chip "★ Favoritos" para ver solo esos. Persisten entre sesiones. (Atajo: F)
+[✅] Historial "Vistos recientemente" — botón flotante 🕘 abajo-derecha con panel lateral de los últimos 10 vistos.
+[✅] "Capturados" / Pokédex personal — botón "TENGO" (◉) tipo Pokémon Home + contador "X/1025 capturados" con barra de progreso y desglose por región. (Atajo: G)
+[✅] Notas personales — textarea por Pokémon en la ficha, autoguardado.
+
 🎨 UX / pulido visual
-Filtro por generación con tabs visuales — en lugar de un select, tabs grandes con el logo/color de cada región.
-Filtro multi-tipo — buscar dual-types específicos ("Agua + Veneno" → Tentacruel, Toxapex...).
-Filtro por rango de stats — "muéstrame los más rápidos", "los más débiles", sliders min/max.
-Vista alternativa: lista compacta — toggle entre carrusel y lista densa para cuando quieres scrollear rápido.
-Búsqueda fuzzy — que "charzrd" encuentre Charizard.
-Atajos de teclado visibles — un panel de ayuda con ?.
+[✅] Filtro por generación con tabs visuales — tabs grandes con color de cada región (sincronizados con el select).
+[✅] Filtro multi-tipo — segundo selector "2.º TIPO" para buscar dual-types (ej. Fuego + Volador → Charizard...).
+[✅] Filtro por rango de stats — panel 📊 con sliders min/max por stat + BST, presets (⚡ más rápidos, 💪 más fuertes, 🍃 más débiles). Requiere cargar los datos de stats una vez.
+[✅] Vista alternativa: lista compacta — chip "☰ Lista" para alternar entre carrusel y lista densa. (Atajo: L)
+[✅] Búsqueda fuzzy — "charzrd" encuentra Charizard (tolera erratas, ordena por relevancia).
+[✅] Atajos de teclado visibles — panel de ayuda con "?" (chip "? Ayuda").

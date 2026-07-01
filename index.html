@@ -159,6 +159,10 @@
             <span class="filter-count" id="filterCount">— Pokémon</span>
           </div>
         </div>
+        <!-- Personal-dex controls (favoritos / capturados / gen tabs / stats / vista) -->
+        <div class="pdex-controls" id="pdexControls"></div>
+        <div class="stat-filter-panel hidden" id="statFilterPanel"></div>
+        <div class="dex-progress-wrap" id="dexProgressWrap"></div>
       </div>
 
       <!-- STAGE SECTION (Carousel) -->
@@ -210,6 +214,9 @@
         <button class="pag-btn" id="pagFwd10" title="Avanzar 10">»</button>
         <button class="pag-btn" id="pagLast" title="Último">⟫</button>
       </div>
+
+      <!-- COMPACT LIST VIEW (toggle) -->
+      <div class="compact-list hidden" id="compactList"></div>
 
       <!-- DETAIL CARD -->
       <div class="card-wrapper hidden" id="cardWrapper">
@@ -288,6 +295,11 @@
               <div class="locations-list" id="locationsList">
                 <span class="loc-empty">—</span>
               </div>
+            </div>
+            <div class="section-block">
+              <div class="section-title">◆ NOTA PERSONAL <small class="section-hint">(se guarda automáticamente)</small></div>
+              <textarea class="poke-note" id="pokeNote" rows="2"
+                placeholder="Ej: lo usé en mi run de Esmeralda..." maxlength="500"></textarea>
             </div>
           </div>
         </div>

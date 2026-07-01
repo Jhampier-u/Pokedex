@@ -226,6 +226,8 @@ async function loadCatalog() {
     state.allPokemon = data.results.map(p => ({ id: getId(p.url), name: p.name }));
     catalogLoading.classList.add("hidden");
     pagTotal.textContent = state.allPokemon.length;
+    pdexRenderRecent();
+    pdexRenderProgress();
     await applyFilters({ resetIndex: true });
   } catch {
     catalogLoading.classList.add("hidden");
@@ -245,58 +247,77 @@ async function applyFilters({ resetIndex = false } = {}) {
   const sortVal   = filterSort.value;
   const rawName   = filterName.value.trim().toLowerCase();
 
-  if (typeVal && !state.typeCache[typeVal]) {
-    typeLoading.classList.remove("hidden");
-    try {
-      const r = await fetch(`https://pokeapi.co/api/v2/type/${typeVal}`);
-      const d = await r.json();
-      state.typeCache[typeVal] = new Set(
-        d.pokemon.map(p => getId(p.pokemon.url)).filter(id => id >= 1 && id <= 1025)
-      );
-    } catch { state.typeCache[typeVal] = new Set(); }
-    typeLoading.classList.add("hidden");
-  }
-  const typeIds = typeVal ? state.typeCache[typeVal] : null;
+  const type2Val = $("filterType2") ? $("filterType2").value : "";
+  await ensureTypeCache(typeVal);
+  await ensureTypeCache(type2Val);
+  const typeIds  = typeVal  ? state.typeCache[typeVal]  : null;
+  const type2Ids = type2Val ? state.typeCache[type2Val] : null;
   const numericSearch = rawName && /^\d+$/.test(rawName) ? parseInt(rawName, 10) : null;
+  const sf = pdexStatFilter();
 
   let list = state.allPokemon.filter(p => {
-    if (typeIds && !typeIds.has(p.id)) return false;
+    if (typeIds  && !typeIds.has(p.id))  return false;
+    if (type2Ids && !type2Ids.has(p.id)) return false;
     if (regionVal) {
       const [mn, mx] = REGIONS[regionVal];
       if (p.id < mn || p.id > mx) return false;
     }
-    if (rawName && numericSearch === null && !p.name.includes(rawName)) return false;
     if (numericSearch !== null && p.id !== numericSearch) return false;
+    if (pdexUI.favOnly    && !PDEX.favs.has(p.id))   return false;
+    if (pdexUI.caughtOnly && !PDEX.caught.has(p.id)) return false;
+    if (sf.active) {
+      const st = state.statIndex[p.id];
+      if (!st) return false;
+      for (const k in sf.ranges) {
+        const [mn, mx] = sf.ranges[k];
+        if (st[k] < mn || st[k] > mx) return false;
+      }
+    }
     return true;
   });
-  list.sort((a, b) => {
-    switch (sortVal) {
-      case "id-asc":    return a.id - b.id;
-      case "id-desc":   return b.id - a.id;
-      case "name-asc":  return a.name.localeCompare(b.name);
-      case "name-desc": return b.name.localeCompare(a.name);
-      default:          return a.id - b.id;
+
+  const fuzzyActive = rawName && numericSearch === null;
+  if (fuzzyActive) {
+    // Fuzzy name search — tolerates typos ("charzrd" → charizard); ordered by relevance.
+    const scored = [];
+    for (const p of list) {
+      const sc = fuzzyScore(rawName, p.name);
+      if (sc >= 0) scored.push([sc, p]);
     }
-  });
+    scored.sort((a, b) => b[0] - a[0] || a[1].id - b[1].id);
+    list = scored.map(x => x[1]);
+  } else {
+    list.sort((a, b) => {
+      switch (sortVal) {
+        case "id-asc":    return a.id - b.id;
+        case "id-desc":   return b.id - a.id;
+        case "name-asc":  return a.name.localeCompare(b.name);
+        case "name-desc": return b.name.localeCompare(a.name);
+        default:          return a.id - b.id;
+      }
+    });
+  }
 
   state.filtered = list;
   if (resetIndex || state.current >= list.length) state.current = 0;
   filterCount.textContent = `${list.length} Pokémon`;
 
+  pdexRenderProgress();
   if (list.length === 0) {
     stage.innerHTML = "";
     cardWrapper.classList.add("hidden");
     pagination.classList.add("hidden");
+    $("compactList").classList.add("hidden");
     noResults.classList.remove("hidden");
     return;
   }
   noResults.classList.add("hidden");
-  cardWrapper.classList.remove("hidden");
   pagination.classList.remove("hidden");
   pagTotal.textContent = list.length;
 
   renderStage();
   scheduleDetailLoad();
+  pdexApplyViewMode();
 }
 
 // ════════════════════════════════════════════════════════
@@ -514,6 +535,16 @@ document.addEventListener("keydown", e => {
     if (e.key === "Escape") closeModal();
     return;
   }
+  const helpEl = document.getElementById("helpOverlay");
+  if (helpEl && !helpEl.classList.contains("hidden")) {
+    if (e.key === "Escape" || e.key === "?") pdexToggleHelp();
+    return;
+  }
+  const recentEl = document.getElementById("recentPanel");
+  if (recentEl && recentEl.classList.contains("open")) {
+    if (e.key === "Escape") pdexCloseRecent();
+    return;
+  }
   switch (e.key) {
     case "ArrowLeft":  e.preventDefault(); navigate(-1); break;
     case "ArrowRight": e.preventDefault(); navigate(+1); break;
@@ -526,6 +557,10 @@ document.addEventListener("keydown", e => {
     case "s": case "S": toggleShiny(); break;
     case "a": case "A": toggleAnimated(); break;
     case "m": case "M": toggleMusic(); break;
+    case "f": case "F": pdexToggleFav(); break;
+    case "g": case "G": pdexToggleCaught(); break;
+    case "l": case "L": pdexToggleView(); break;
+    case "?":          e.preventDefault(); pdexToggleHelp(); break;
     case "/":          e.preventDefault(); filterName.focus(); break;
   }
 });
@@ -543,6 +578,7 @@ function scheduleDetailLoad() {
   stageNum.textContent  = `#${padId(cur.id)}`;
   stageName.textContent = cur.name.toUpperCase();
   animBtn.classList.toggle("disabled", cur.id > 649);
+  pdexUpdateForCurrent(cur);
 
   const newRegion = regionForId(cur.id);
   if (newRegion !== state.currentRegion) {
@@ -600,6 +636,8 @@ async function loadCenterDetail() {
 
     // 3. Render base data
     renderAll(data, species);
+    pdexRecordRecent(cur.id);
+    pdexIndexStats(data);   // opportunistically cache stats for the stat-range filter
 
     // 4. Lazy load evolution chain
     if (species.evolutionUrl) {
@@ -1191,8 +1229,536 @@ function toggleMusic() {
 musicBtn.addEventListener("click", toggleMusic);
 
 // ════════════════════════════════════════════════════════
+//  PERSONAL  DEX   (favoritos · capturados · notas · historial)
+//  +  filtros avanzados  (gen tabs · multi-tipo · stats · fuzzy · vista)
+// ════════════════════════════════════════════════════════
+state.statIndex   = {};
+state.statAllLoaded = false;
+
+const PDEX = { favs: new Set(), caught: new Set(), notes: {}, recent: [] };
+const pdexUI = { favOnly: false, caughtOnly: false, listView: false };
+
+const REGION_META = {
+  kanto:  { label: "Kanto",  roman: "I",    color: "#E3350D" },
+  johto:  { label: "Johto",  roman: "II",   color: "#C7A008" },
+  hoenn:  { label: "Hoenn",  roman: "III",  color: "#2AA35B" },
+  sinnoh: { label: "Sinnoh", roman: "IV",   color: "#6C8CC7" },
+  unova:  { label: "Unova",  roman: "V",    color: "#5A5A6E" },
+  kalos:  { label: "Kalos",  roman: "VI",   color: "#8E44AD" },
+  alola:  { label: "Alola",  roman: "VII",  color: "#F39C12" },
+  galar:  { label: "Galar",  roman: "VIII", color: "#C0392B" },
+  paldea: { label: "Paldea", roman: "IX",   color: "#16A085" },
+};
+const STAT_ORDER = ["hp","attack","defense","special-attack","special-defense","speed"];
+
+// ── storage ──────────────────────────────────────────────
+function pdexLoad() {
+  try { PDEX.favs   = new Set(JSON.parse(localStorage.getItem("pdex_favs")   || "[]")); } catch {}
+  try { PDEX.caught = new Set(JSON.parse(localStorage.getItem("pdex_caught") || "[]")); } catch {}
+  try { PDEX.notes  = JSON.parse(localStorage.getItem("pdex_notes")  || "{}") || {}; } catch {}
+  try { PDEX.recent = JSON.parse(localStorage.getItem("pdex_recent") || "[]") || []; } catch {}
+}
+function pdexSave(key) {
+  try {
+    if (key === "favs")   localStorage.setItem("pdex_favs",   JSON.stringify([...PDEX.favs]));
+    if (key === "caught") localStorage.setItem("pdex_caught", JSON.stringify([...PDEX.caught]));
+    if (key === "notes")  localStorage.setItem("pdex_notes",  JSON.stringify(PDEX.notes));
+    if (key === "recent") localStorage.setItem("pdex_recent", JSON.stringify(PDEX.recent));
+  } catch {}
+}
+
+// ── fuzzy search ─────────────────────────────────────────
+function lev(a, b) {
+  const m = a.length, n = b.length;
+  if (!m) return n; if (!n) return m;
+  let prev = Array.from({ length: n + 1 }, (_, i) => i);
+  for (let i = 1; i <= m; i++) {
+    let cur = [i];
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+    }
+    prev = cur;
+  }
+  return prev[n];
+}
+function fuzzyScore(q, name) {
+  q = q.toLowerCase(); name = name.toLowerCase();
+  if (name === q) return 1000;
+  if (name.startsWith(q)) return 900 - (name.length - q.length);
+  const idx = name.indexOf(q);
+  if (idx >= 0) return 700 - idx - (name.length - q.length);
+  // subsequence (in order, gaps allowed)
+  let qi = 0;
+  for (let i = 0; i < name.length && qi < q.length; i++) if (name[i] === q[qi]) qi++;
+  if (qi === q.length && q.length >= 3) return 400 - (name.length - q.length);
+  // typo tolerance
+  const d = lev(q, name);
+  const tol = q.length <= 4 ? 1 : q.length <= 7 ? 2 : 3;
+  if (d <= tol) return 300 - d * 60;
+  return -1;
+}
+
+// ── type caches (used by primary + secondary type filters) ──
+async function ensureTypeCache(tv) {
+  if (!tv || state.typeCache[tv]) return;
+  typeLoading.classList.remove("hidden");
+  try {
+    const r = await fetch(`https://pokeapi.co/api/v2/type/${tv}`);
+    const d = await r.json();
+    state.typeCache[tv] = new Set(
+      d.pokemon.map(p => getId(p.pokemon.url)).filter(id => id >= 1 && id <= 1025)
+    );
+  } catch { state.typeCache[tv] = new Set(); }
+  typeLoading.classList.add("hidden");
+}
+
+// ── stat index (for stat-range filter) ───────────────────
+function pdexIndexStats(data) {
+  if (!data || !data.stats || state.statIndex[data.id]) return;
+  const rec = {};
+  data.stats.forEach(s => rec[s.stat.name] = s.base_stat);
+  rec.bst = STAT_ORDER.reduce((t, k) => t + (rec[k] || 0), 0);
+  state.statIndex[data.id] = rec;
+}
+async function pdexLoadAllStats() {
+  if (state.statAllLoaded || state._statLoading) return;
+  state._statLoading = true;
+  const ids = state.allPokemon.map(p => p.id).filter(id => !state.statIndex[id]);
+  const bar = $("statLoadBar");
+  let done = state.allPokemon.length - ids.length;
+  const total = state.allPokemon.length;
+  const setBar = () => { if (bar) bar.style.width = Math.round(done / total * 100) + "%"; };
+  setBar();
+  const queue = ids.slice();
+  async function worker() {
+    while (queue.length) {
+      const id = queue.shift();
+      try {
+        const d = await fetchPokemonByName(id);
+        pdexIndexStats(d);
+      } catch {}
+      done++;
+      if (done % 12 === 0) setBar();
+    }
+  }
+  await Promise.all(Array.from({ length: 24 }, worker));
+  setBar();
+  state.statAllLoaded = true;
+  state._statLoading = false;
+  const panel = $("statFilterPanel");
+  if (panel) panel.classList.remove("stats-locked");
+  const st = $("statLoadStatus");
+  if (st) st.textContent = "✓ Datos de stats listos";
+  applyFilters({ resetIndex: true });
+}
+function pdexStatFilter() {
+  const panel = $("statFilterPanel");
+  if (!panel || panel.classList.contains("hidden") || !state.statAllLoaded)
+    return { active: false, ranges: {} };
+  const ranges = {};
+  let active = false;
+  panel.querySelectorAll(".stat-slider-row").forEach(row => {
+    const key = row.dataset.key;
+    const mn = parseInt(row.querySelector(".ss-min").value, 10);
+    const mx = parseInt(row.querySelector(".ss-max").value, 10);
+    const cap = key === "bst" ? 800 : 255;
+    if (mn > 0 || mx < cap) { ranges[key] = [mn, mx]; active = true; }
+  });
+  return { active, ranges };
+}
+
+// ── favoritos / capturados / notas / recientes ───────────
+function pdexToggleFav() {
+  const cur = state.filtered[state.current]; if (!cur) return;
+  if (PDEX.favs.has(cur.id)) PDEX.favs.delete(cur.id); else PDEX.favs.add(cur.id);
+  pdexSave("favs"); pdexUpdateForCurrent(cur); pdexRenderProgress();
+  if (pdexUI.favOnly) applyFilters({ resetIndex: false });
+  else pdexRefreshCompactRow(cur.id);
+}
+function pdexToggleCaught() {
+  const cur = state.filtered[state.current]; if (!cur) return;
+  if (PDEX.caught.has(cur.id)) PDEX.caught.delete(cur.id); else PDEX.caught.add(cur.id);
+  pdexSave("caught"); pdexUpdateForCurrent(cur); pdexRenderProgress();
+  if (pdexUI.caughtOnly) applyFilters({ resetIndex: false });
+  else pdexRefreshCompactRow(cur.id);
+}
+function pdexUpdateForCurrent(cur) {
+  if (!cur) return;
+  const favBtn = $("favBtn"), caughtBtn = $("caughtBtn"), note = $("pokeNote");
+  if (favBtn)    favBtn.classList.toggle("on", PDEX.favs.has(cur.id));
+  if (caughtBtn) caughtBtn.classList.toggle("on", PDEX.caught.has(cur.id));
+  if (note) { note.value = PDEX.notes[cur.id] || ""; note.dataset.id = cur.id; }
+}
+function pdexRecordRecent(id) {
+  PDEX.recent = [id, ...PDEX.recent.filter(x => x !== id)].slice(0, 10);
+  pdexSave("recent");
+  pdexRenderRecent();
+}
+
+// ── progress bar (capturados por región) ─────────────────
+function pdexRenderProgress() {
+  const wrap = $("dexProgressWrap"); if (!wrap) return;
+  const total = state.allPokemon.length || 1025;
+  const caught = PDEX.caught.size;
+  const regVal = filterRegion.value;
+  let regHtml = "";
+  if (regVal && REGION_META[regVal]) {
+    const [mn, mx] = REGIONS[regVal];
+    let c = 0; for (const id of PDEX.caught) if (id >= mn && id <= mx) c++;
+    const rt = mx - mn + 1;
+    regHtml = `<span class="dexp-region" style="--rc:${REGION_META[regVal].color}">
+      ${REGION_META[regVal].label}: <b>${c}/${rt}</b></span>`;
+  }
+  const pct = Math.round(caught / total * 100);
+  wrap.innerHTML = `
+    <div class="dexp-head">
+      <span class="dexp-title">◉ POKÉDEX PERSONAL</span>
+      <span class="dexp-count"><b>${caught}</b> / ${total} capturados (${pct}%)</span>
+      ${regHtml}
+      <span class="dexp-fav">★ ${PDEX.favs.size} favoritos</span>
+    </div>
+    <div class="dexp-bar"><div class="dexp-fill" style="width:${pct}%"></div></div>`;
+}
+
+// ── recientes (panel lateral) ────────────────────────────
+function pdexRenderRecent() {
+  const list = $("recentList"); if (!list) return;
+  const badge = $("recentBadge");
+  if (badge) badge.textContent = PDEX.recent.length;
+  if (!PDEX.recent.length) { list.innerHTML = `<p class="recent-empty">Aún no has visto ninguno.</p>`; return; }
+  list.innerHTML = "";
+  PDEX.recent.forEach(id => {
+    const p = state.allPokemon.find(x => x.id === id);
+    const name = p ? p.name : "#" + id;
+    const row = document.createElement("button");
+    row.className = "recent-item";
+    row.innerHTML = `
+      <img src="${spriteFor(id)}" alt="" loading="lazy"/>
+      <span class="ri-num">#${padId(id)}</span>
+      <span class="ri-name">${cap(name)}</span>
+      ${PDEX.caught.has(id) ? '<span class="ri-tag">◉</span>' : ''}
+      ${PDEX.favs.has(id)   ? '<span class="ri-tag ri-fav">★</span>' : ''}`;
+    row.addEventListener("click", () => { jumpToId(id); pdexCloseRecent(); });
+    list.appendChild(row);
+  });
+}
+function pdexOpenRecent()  { $("recentPanel").classList.add("open"); }
+function pdexCloseRecent() { $("recentPanel").classList.remove("open"); }
+
+// ── vista compacta (lista densa) ─────────────────────────
+function pdexToggleView() { pdexUI.listView = !pdexUI.listView; pdexApplyViewMode(); }
+function pdexApplyViewMode() {
+  const chip = $("chipView");
+  if (chip) chip.classList.toggle("on", pdexUI.listView);
+  const stageSection = document.querySelector(".stage-section");
+  const compact = $("compactList");
+  if (pdexUI.listView) {
+    if (stageSection) stageSection.classList.add("hidden");
+    pagination.classList.add("hidden");
+    cardWrapper.classList.add("hidden");
+    compact.classList.remove("hidden");
+    pdexRenderCompact();
+  } else {
+    if (stageSection) stageSection.classList.remove("hidden");
+    pagination.classList.remove("hidden");
+    cardWrapper.classList.remove("hidden");
+    compact.classList.add("hidden");
+  }
+}
+function pdexRenderCompact() {
+  const compact = $("compactList");
+  const list = state.filtered;
+  compact.innerHTML = "";
+  const frag = document.createDocumentFragment();
+  list.forEach((p, i) => {
+    const row = document.createElement("button");
+    row.className = "cl-row" + (i === state.current ? " current" : "");
+    row.dataset.id = p.id;
+    row.innerHTML = `
+      <img class="cl-sprite" src="${spriteFor(p.id)}" alt="" loading="lazy"/>
+      <span class="cl-num">#${padId(p.id)}</span>
+      <span class="cl-name">${cap(p.name)}</span>
+      <span class="cl-flags">
+        <span class="cl-flag cl-caught ${PDEX.caught.has(p.id) ? 'on' : ''}" title="Capturado">◉</span>
+        <span class="cl-flag cl-fav ${PDEX.favs.has(p.id) ? 'on' : ''}" title="Favorito">★</span>
+      </span>`;
+    row.querySelector(".cl-caught").addEventListener("click", e => {
+      e.stopPropagation();
+      if (PDEX.caught.has(p.id)) PDEX.caught.delete(p.id); else PDEX.caught.add(p.id);
+      pdexSave("caught"); pdexRefreshCompactRow(p.id); pdexRenderProgress();
+    });
+    row.querySelector(".cl-fav").addEventListener("click", e => {
+      e.stopPropagation();
+      if (PDEX.favs.has(p.id)) PDEX.favs.delete(p.id); else PDEX.favs.add(p.id);
+      pdexSave("favs"); pdexRefreshCompactRow(p.id); pdexRenderProgress();
+    });
+    row.addEventListener("click", () => {
+      navigateTo(i);
+      pdexUI.listView = false; pdexApplyViewMode();
+    });
+    frag.appendChild(row);
+  });
+  compact.appendChild(frag);
+}
+function pdexRefreshCompactRow(id) {
+  const row = $("compactList")?.querySelector(`.cl-row[data-id="${id}"]`);
+  if (!row) return;
+  row.querySelector(".cl-caught").classList.toggle("on", PDEX.caught.has(id));
+  row.querySelector(".cl-fav").classList.toggle("on", PDEX.favs.has(id));
+}
+function pdexAfterFilter() { /* reserved */ }
+
+// ── panel de ayuda (atajos) ──────────────────────────────
+function pdexToggleHelp() {
+  const ov = $("helpOverlay"); if (!ov) return;
+  ov.classList.toggle("hidden");
+}
+
+// ── build UI ─────────────────────────────────────────────
+function pdexBuildControls() {
+  // secondary type select (clone options from primary)
+  const typeOpts = filterType.innerHTML;
+  const controls = $("pdexControls");
+  controls.innerHTML = `
+    <div class="pdex-row">
+      <div class="filter-group">
+        <span class="filter-label">▸ 2.º TIPO</span>
+        <select class="filter-sel" id="filterType2">${typeOpts}</select>
+      </div>
+      <div class="pdex-chips">
+        <button class="filter-chip" id="chipFav" title="Ver solo favoritos">★ Favoritos</button>
+        <button class="filter-chip" id="chipCaught" title="Ver solo capturados">◉ Capturados</button>
+        <button class="filter-chip" id="chipStats" title="Filtro por estadísticas">📊 Stats</button>
+        <button class="filter-chip" id="chipView" title="Vista de lista compacta (L)">☰ Lista</button>
+        <button class="filter-chip" id="chipHelp" title="Atajos de teclado (?)">? Ayuda</button>
+      </div>
+    </div>
+    <div class="gen-tabs" id="genTabs"></div>`;
+
+  // generation tabs
+  const genTabs = $("genTabs");
+  const mkTab = (val, label, sub, color) => {
+    const b = document.createElement("button");
+    b.className = "gen-tab";
+    b.dataset.region = val;
+    b.style.setProperty("--gc", color || "#888");
+    b.innerHTML = `<span class="gt-label">${label}</span>${sub ? `<span class="gt-sub">${sub}</span>` : ""}`;
+    b.addEventListener("click", () => {
+      filterRegion.value = val;
+      pdexSyncGenTabs();
+      applyFilters({ resetIndex: true });
+    });
+    genTabs.appendChild(b);
+  };
+  mkTab("", "TODAS", "Nacional", "#CFCFCF");
+  Object.entries(REGION_META).forEach(([k, m]) => mkTab(k, m.label, "Gen " + m.roman, m.color));
+
+  // stat filter panel
+  const STAT_UI = [
+    ["hp", "PS", 255], ["attack", "ATAQUE", 255], ["defense", "DEFENSA", 255],
+    ["special-attack", "AT. ESP.", 255], ["special-defense", "DEF. ESP.", 255],
+    ["speed", "VELOCIDAD", 255], ["bst", "TOTAL (BST)", 800],
+  ];
+  const panel = $("statFilterPanel");
+  panel.classList.add("stats-locked");
+  panel.innerHTML = `
+    <div class="sfp-head">
+      <span class="sfp-title">📊 FILTRO POR ESTADÍSTICAS</span>
+      <div class="sfp-presets">
+        <button class="sfp-preset" data-preset="fast">⚡ Más rápidos</button>
+        <button class="sfp-preset" data-preset="strong">💪 Más fuertes</button>
+        <button class="sfp-preset" data-preset="weak">🍃 Más débiles</button>
+        <button class="sfp-preset" data-preset="reset">↺ Reiniciar</button>
+      </div>
+    </div>
+    <div class="sfp-status">
+      <span id="statLoadStatus">Se necesitan los datos de stats de los 1025 Pokémon.</span>
+      <button class="sfp-load" id="statLoadBtn">Cargar datos</button>
+      <div class="sfp-progress"><div class="sfp-progress-fill" id="statLoadBar"></div></div>
+    </div>
+    <div class="sfp-grid">
+      ${STAT_UI.map(([key, label, cap]) => `
+        <div class="stat-slider-row" data-key="${key}" data-cap="${cap}">
+          <span class="ssr-label">${label}</span>
+          <div class="ssr-controls">
+            <input type="range" class="ss-min" min="0" max="${cap}" value="0" step="5"/>
+            <input type="range" class="ss-max" min="0" max="${cap}" value="${cap}" step="5"/>
+          </div>
+          <span class="ssr-val"><b class="ssv-min">0</b>–<b class="ssv-max">${cap}</b></span>
+        </div>`).join("")}
+    </div>`;
+
+  // recent panel + toggle button
+  const recentBtn = document.createElement("button");
+  recentBtn.className = "recent-fab";
+  recentBtn.id = "recentFab";
+  recentBtn.innerHTML = `🕘 <span class="recent-badge" id="recentBadge">0</span>`;
+  recentBtn.title = "Vistos recientemente";
+  const recentPanel = document.createElement("aside");
+  recentPanel.className = "recent-panel";
+  recentPanel.id = "recentPanel";
+  recentPanel.innerHTML = `
+    <div class="recent-head">
+      <span>🕘 VISTOS RECIENTEMENTE</span>
+      <button class="recent-close" id="recentClose">✕</button>
+    </div>
+    <div class="recent-list" id="recentList"></div>`;
+  document.querySelector(".app-root").appendChild(recentBtn);
+  document.querySelector(".app-root").appendChild(recentPanel);
+
+  // help overlay
+  const help = document.createElement("div");
+  help.className = "help-overlay hidden";
+  help.id = "helpOverlay";
+  help.innerHTML = `
+    <div class="help-card">
+      <button class="help-close" id="helpClose">✕</button>
+      <h3 class="help-title">⌨ ATAJOS DE TECLADO</h3>
+      <div class="help-grid">
+        <div><kbd>←</kbd> <kbd>→</kbd></div><span>Navegar Pokémon</span>
+        <div><kbd>↑</kbd> <kbd>↓</kbd></div><span>Saltar de 10 en 10</span>
+        <div><kbd>Inicio</kbd> <kbd>Fin</kbd></div><span>Primero / último</span>
+        <div><kbd>R</kbd></div><span>Aleatorio</span>
+        <div><kbd>C</kbd></div><span>Reproducir grito</span>
+        <div><kbd>S</kbd></div><span>Variante shiny</span>
+        <div><kbd>A</kbd></div><span>Sprite animado</span>
+        <div><kbd>M</kbd></div><span>Música ambiente</span>
+        <div><kbd>F</kbd></div><span>Marcar favorito ★</span>
+        <div><kbd>G</kbd></div><span>Marcar capturado ◉</span>
+        <div><kbd>L</kbd></div><span>Vista lista / carrusel</span>
+        <div><kbd>/</kbd></div><span>Buscar</span>
+        <div><kbd>?</kbd></div><span>Esta ayuda</span>
+      </div>
+    </div>`;
+  document.body.appendChild(help);
+
+  // stage tools: favorito + capturado
+  const tools = document.querySelector(".stage-tools");
+  if (tools) {
+    const favBtn = document.createElement("button");
+    favBtn.className = "stage-tool"; favBtn.id = "favBtn";
+    favBtn.title = "Favorito (F)";
+    favBtn.innerHTML = `<span class="st-icon">★</span><span class="st-label">FAV</span>`;
+    favBtn.addEventListener("click", pdexToggleFav);
+    const caughtBtn = document.createElement("button");
+    caughtBtn.className = "stage-tool"; caughtBtn.id = "caughtBtn";
+    caughtBtn.title = "Capturado (G)";
+    caughtBtn.innerHTML = `<span class="st-icon">◉</span><span class="st-label">TENGO</span>`;
+    caughtBtn.addEventListener("click", pdexToggleCaught);
+    tools.appendChild(favBtn);
+    tools.appendChild(caughtBtn);
+  }
+}
+function pdexSyncGenTabs() {
+  const val = filterRegion.value;
+  document.querySelectorAll(".gen-tab").forEach(t =>
+    t.classList.toggle("active", t.dataset.region === val));
+}
+
+function pdexBindControls() {
+  $("filterType2").addEventListener("change", () => applyFilters({ resetIndex: true }));
+  $("chipFav").addEventListener("click", () => {
+    pdexUI.favOnly = !pdexUI.favOnly;
+    $("chipFav").classList.toggle("on", pdexUI.favOnly);
+    applyFilters({ resetIndex: true });
+  });
+  $("chipCaught").addEventListener("click", () => {
+    pdexUI.caughtOnly = !pdexUI.caughtOnly;
+    $("chipCaught").classList.toggle("on", pdexUI.caughtOnly);
+    applyFilters({ resetIndex: true });
+  });
+  $("chipStats").addEventListener("click", () => {
+    const panel = $("statFilterPanel");
+    const nowHidden = panel.classList.toggle("hidden");
+    $("chipStats").classList.toggle("on", !nowHidden);
+    // Re-filter on both show and hide so the list never keeps a stale stat filter.
+    applyFilters({ resetIndex: true });
+  });
+  $("chipView").addEventListener("click", pdexToggleView);
+  $("chipHelp").addEventListener("click", pdexToggleHelp);
+
+  filterRegion.addEventListener("change", pdexSyncGenTabs);
+
+  // stat panel controls
+  const panel = $("statFilterPanel");
+  $("statLoadBtn").addEventListener("click", () => {
+    $("statLoadBtn").disabled = true;
+    $("statLoadStatus").textContent = "Cargando datos de stats…";
+    pdexLoadAllStats();
+  });
+  panel.querySelectorAll(".stat-slider-row").forEach(row => {
+    const min = row.querySelector(".ss-min"), max = row.querySelector(".ss-max");
+    const vMin = row.querySelector(".ssv-min"), vMax = row.querySelector(".ssv-max");
+    const upd = () => {
+      let a = parseInt(min.value, 10), b = parseInt(max.value, 10);
+      if (a > b) { if (document.activeElement === min) max.value = a, b = a; else min.value = b, a = b; }
+      vMin.textContent = a; vMax.textContent = b;
+    };
+    const commit = () => { upd(); if (state.statAllLoaded) applyFilters({ resetIndex: true }); };
+    min.addEventListener("input", upd); max.addEventListener("input", upd);
+    min.addEventListener("change", commit); max.addEventListener("change", commit);
+  });
+  panel.querySelectorAll(".sfp-preset").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const setRow = (key, mn, mx) => {
+        const r = panel.querySelector(`.stat-slider-row[data-key="${key}"]`);
+        if (!r) return;
+        const cap = parseInt(r.dataset.cap, 10);
+        r.querySelector(".ss-min").value = mn;
+        r.querySelector(".ss-max").value = mx == null ? cap : mx;
+        r.querySelector(".ssv-min").textContent = mn;
+        r.querySelector(".ssv-max").textContent = mx == null ? cap : mx;
+      };
+      const reset = () => STAT_ORDER.concat("bst").forEach(k => setRow(k, 0, null));
+      reset();
+      const p = btn.dataset.preset;
+      if (p === "fast")   setRow("speed", 100, null);
+      if (p === "strong") setRow("bst", 500, null);
+      if (p === "weak")   setRow("bst", 0, 320);
+      if (!state.statAllLoaded && !state._statLoading) { $("statLoadBtn").click(); }
+      else if (state.statAllLoaded) applyFilters({ resetIndex: true });
+    });
+  });
+
+  // recent + help wiring
+  $("recentFab").addEventListener("click", pdexOpenRecent);
+  $("recentClose").addEventListener("click", pdexCloseRecent);
+  $("helpClose").addEventListener("click", pdexToggleHelp);
+  $("helpOverlay").addEventListener("click", e => { if (e.target === $("helpOverlay")) pdexToggleHelp(); });
+
+  // notes (autosave, debounced)
+  const note = $("pokeNote");
+  if (note) {
+    let noteTimer = null;
+    note.addEventListener("input", () => {
+      const id = parseInt(note.dataset.id, 10);
+      if (!id) return;
+      if (noteTimer) clearTimeout(noteTimer);
+      noteTimer = setTimeout(() => {
+        const v = note.value.trim();
+        if (v) PDEX.notes[id] = v; else delete PDEX.notes[id];
+        pdexSave("notes");
+        const cur = state.filtered[state.current];
+        if (cur) pdexRefreshCompactRow(cur.id);
+      }, 400);
+    });
+  }
+}
+
+function pdexInit() {
+  pdexLoad();
+  pdexBuildControls();
+  pdexBindControls();
+  pdexSyncGenTabs();
+  pdexRenderProgress();
+  pdexRenderRecent();
+}
+
+// ════════════════════════════════════════════════════════
 //  INIT
 // ════════════════════════════════════════════════════════
+pdexInit();
 loadCatalog();
 
 
