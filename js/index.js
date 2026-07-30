@@ -86,11 +86,14 @@ const typeNamesOf = pokemon => pokemon.types.map(t => t.type.name);
 const CURRENT_GEN = 9;
 const GEN_ROMAN   = { i:1, ii:2, iii:3, iv:4, v:5, vi:6, vii:7, viii:8, ix:9 };
 const genNumber   = name => GEN_ROMAN[String(name).replace("generation-", "")] || CURRENT_GEN;
-const GEN_LABELS  = {
-  1:"Gen I · Kanto", 2:"Gen II · Johto", 3:"Gen III · Hoenn", 4:"Gen IV · Sinnoh",
-  5:"Gen V · Unova", 6:"Gen VI · Kalos", 7:"Gen VII · Alola", 8:"Gen VIII · Galar",
-  9:"Actual (Gen IX)",
+// Sin nombres de región a propósito: este control NO filtra por región (de eso
+// se encargan los tabs de generación). Mezclarlos hacía que pareciesen lo mismo.
+const GEN_LABELS = {
+  1:"Gen I", 2:"Gen II", 3:"Gen III", 4:"Gen IV", 5:"Gen V",
+  6:"Gen VI", 7:"Gen VII", 8:"Gen VIII", 9:"Gen IX",
 };
+const genOptionLabel = g =>
+  g === CURRENT_GEN ? "Actuales (Gen IX)" : `Reglas de ${GEN_LABELS[g]}`;
 
 function relationsToRow(rel) {
   const row = {};
@@ -194,7 +197,11 @@ const state = {
   animatedMode: false,
   musicOn:      false,
   mode:         "pokedex",  // modo activo (pokedex · quiz · duel · team · roulette)
-  gen:          9,          // época activa: 9 = reglas actuales
+  gen:          9,          // reglas activas: 9 = generación actual
+  region:       "",         // filtro de región; "" = Pokédex Nacional entera.
+                            // Los tabs de generación son su ÚNICO control: antes
+                            // había además un <select> que hacía exactamente lo
+                            // mismo y había que mantener sincronizado.
   currentRegion: "kanto",
   currentVariety: null,    // alternate-form override (pokemon name); null = default
 };
@@ -206,7 +213,6 @@ const introOverlay = $("introOverlay");
 const bigLight     = $("bigLight");
 
 const filterType   = $("filterType");
-const filterRegion = $("filterRegion");
 const filterSort   = $("filterSort");
 const filterName   = $("filterName");
 const filterCount  = $("filterCount");
@@ -431,7 +437,7 @@ let filterSeq = 0;
 async function applyFilters({ resetIndex = false } = {}) {
   const seq = ++filterSeq;
   const typeVal   = filterType.value;
-  const regionVal = filterRegion.value;
+  const regionVal = state.region;
   const sortVal   = filterSort.value;
   const rawName   = filterName.value.trim().toLowerCase();
 
@@ -641,9 +647,9 @@ function jumpToId(id) {
   // No está en la vista actual. Hay que relajar TODOS los filtros que puedan
   // estarlo ocultando —antes solo se limpiaban tres y el salto fallaba en
   // silencio con "★ Favoritos", "◉ Capturados", 2.º tipo o el filtro de stats.
-  filterName.value   = "";
-  filterType.value   = "";
-  filterRegion.value = "";
+  filterName.value = "";
+  filterType.value = "";
+  state.region     = "";
   const type2 = $("filterType2");
   if (type2) type2.value = "";
 
@@ -735,7 +741,6 @@ randomBtn.addEventListener("click", navigateRandom);
 })();
 
 filterType.addEventListener("change",   () => applyFilters({ resetIndex: true }));
-filterRegion.addEventListener("change", () => applyFilters({ resetIndex: true }));
 filterSort.addEventListener("change",   () => applyFilters({ resetIndex: true }));
 filterName.addEventListener("input",    () => debouncedFilter(true));
 
@@ -1930,7 +1935,7 @@ function pdexRenderProgress() {
   const wrap = $("dexProgressWrap"); if (!wrap) return;
   const total = state.allPokemon.length || 1025;
   const caught = PDEX.caught.size;
-  const regVal = filterRegion.value;
+  const regVal = state.region;
   let regHtml = "";
   if (regVal && REGION_META[regVal]) {
     const [mn, mx] = REGIONS[regVal];
@@ -2055,13 +2060,6 @@ function pdexBuildControls() {
         <span class="filter-label">▸ 2.º TIPO</span>
         <select class="filter-sel" id="filterType2">${typeOpts}</select>
       </div>
-      <div class="filter-group">
-        <span class="filter-label">▸ ÉPOCA</span>
-        <select class="filter-sel" id="filterGen" title="Reglas de qué generación aplicar">
-          ${[9,8,7,6,5,4,3,2,1].map(g =>
-            `<option value="${g}">${GEN_LABELS[g]}</option>`).join("")}
-        </select>
-      </div>
       <div class="pdex-chips">
         <button class="filter-chip" id="chipFav" title="Ver solo favoritos">★ Favoritos</button>
         <button class="filter-chip" id="chipCaught" title="Ver solo capturados">◉ Capturados</button>
@@ -2082,7 +2080,7 @@ function pdexBuildControls() {
     b.style.setProperty("--gc", color || "#888");
     b.innerHTML = `<span class="gt-label">${label}</span>${sub ? `<span class="gt-sub">${sub}</span>` : ""}`;
     b.addEventListener("click", () => {
-      filterRegion.value = val;
+      state.region = val;
       pdexSyncGenTabs();
       applyFilters({ resetIndex: true });
     });
@@ -2215,7 +2213,7 @@ function pdexBuildControls() {
   }
 }
 function pdexSyncGenTabs() {
-  const val = filterRegion.value;
+  const val = state.region;
   document.querySelectorAll(".gen-tab").forEach(t =>
     t.classList.toggle("active", t.dataset.region === val));
 }
@@ -2275,8 +2273,6 @@ function pdexBindControls() {
     if (TOOL_INITED.team && teamState.members.length) renderTeamAnalysis();
     if (TOOL_INITED.duel && duelState.A && duelState.B) runBattle();
   });
-
-  filterRegion.addEventListener("change", pdexSyncGenTabs);
 
   // stat panel controls
   const panel = $("statFilterPanel");
@@ -2346,6 +2342,11 @@ function pdexBindControls() {
 
 function pdexInit() {
   pdexLoad();
+  const gsel = $("filterGen");
+  if (gsel) {
+    gsel.innerHTML = [9,8,7,6,5,4,3,2,1]
+      .map(g => `<option value="${g}">${genOptionLabel(g)}</option>`).join("");
+  }
   pdexBuildControls();
   pdexBindControls();
   pdexSyncGenTabs();

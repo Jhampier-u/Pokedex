@@ -37,9 +37,15 @@ Y abrir <http://localhost:5599>. También está configurada en `.claude/launch.j
 
 ### Filtros
 
-Tipo y segundo tipo, región (con pestañas de generación), orden, búsqueda difusa
-tolerante a erratas (`charzrd` encuentra a Charizard), rango por estadística con
-presets, y vista de carrusel o lista compacta.
+Tipo y segundo tipo, orden, búsqueda difusa tolerante a erratas (`charzrd`
+encuentra a Charizard), rango por estadística con presets, y vista de carrusel o
+lista compacta. La **región** se elige con las pestañas de colores de cada
+generación.
+
+Ojo con no confundir dos controles que suenan parecido: las **pestañas de
+región** eligen *qué Pokémon ves*, mientras que el selector **REGLAS** elige *con
+qué reglas se calculan* tipos y debilidades. Son independientes: puedes ver Kanto
+con reglas de Gen VI.
 
 ### Herramientas
 
