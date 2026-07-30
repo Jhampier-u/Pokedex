@@ -52,7 +52,7 @@ con reglas de Gen VI.
 | Modo | Qué hace |
 |---|---|
 | ❓ ¿Quién es ese Pokémon? | Quiz de siluetas con racha, récord y tres dificultades |
-| ⚔️ Batalla | Comparación de stats al nivel elegido, ventaja de tipo, cálculo de daño en ambas direcciones y pronóstico |
+| ⚔️ Batalla | Calculadora de daño con naturaleza, EVs/IVs, objeto, estado, clima y crítico. Multigolpe, drenaje y probabilidad de estado salen de los metadatos del movimiento; el veredicto compara turnos hasta el K.O. y quién ataca primero según prioridad y velocidad |
 | 🛡️ Equipo | Radar de estadísticas, roles, orden de velocidad, cobertura defensiva y ofensiva, y alertas de sinergia |
 | 🎲 Ruleta | Genera equipos aleatorios por región y tipo, con opción de tipos únicos y sin legendarios |
 
@@ -86,6 +86,11 @@ La URL refleja dónde estás, así que se puede compartir:
 | `L` | Alternar lista y carrusel |
 | `/` | Buscar |
 | `?` | Ayuda |
+
+El simulador usa la fórmula oficial de estadísticas y de daño de gen V+. Las 25
+naturalezas salen de la API; los multiplicadores de los objetos, en cambio,
+están escritos a mano, porque la API describe su efecto en prosa y no publica
+esos números.
 
 ## Datos y caché
 

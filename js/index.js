@@ -2775,10 +2775,102 @@ const duelState = {
   A: null, B: null,
   level: 50,
   moveA: null, moveB: null,
+  weather: "", crit: false,
+  cfg: {
+    A: { nature: "hardy", ivs: 31, evs: {}, item: "", status: "" },
+    B: { nature: "hardy", ivs: 31, evs: {}, item: "", status: "" },
+  },
 };
+const EV_MAX_TOTAL = 510, EV_MAX_STAT = 252;
 
-function initDuel() {
+function buildDuelConfig(side) {
+  const host = $("duelCfg" + side);
+  if (!host) return;
+  const natOpts = (NATURES || []).map(n => {
+    const detail = n.up && n.down && n.up !== n.down
+      ? ` (+${STAT_NAMES[n.up] || n.up} / −${STAT_NAMES[n.down] || n.down})`
+      : " (neutra)";
+    return `<option value="${n.name}">${n.es}${detail}</option>`;
+  }).join("");
+  host.innerHTML = `
+    <div class="dcfg-grid">
+      <label class="dcfg-f">NATURALEZA<select class="dcfg-sel dcfg-nature">${natOpts}</select></label>
+      <label class="dcfg-f">OBJETO<select class="dcfg-sel dcfg-item">
+        ${Object.entries(BATTLE_ITEMS).map(([k, v]) =>
+          `<option value="${k}">${v.label}</option>`).join("")}
+      </select></label>
+      <label class="dcfg-f">ESTADO<select class="dcfg-sel dcfg-status">
+        ${Object.entries(STATUS_OPTS).map(([k, v]) =>
+          `<option value="${k}">${v}</option>`).join("")}
+      </select></label>
+      <label class="dcfg-f">IVs<input type="number" class="dcfg-num dcfg-iv" min="0" max="31" value="31"/></label>
+    </div>
+    <div class="dcfg-evs">
+      <div class="dcfg-evs-head">
+        <span>EVs</span>
+        <span><b class="dcfg-ev-total">0</b> / ${EV_MAX_TOTAL}</span>
+        <button class="dcfg-ev-reset" type="button">↺</button>
+      </div>
+      <div class="dcfg-ev-grid">
+        ${STAT_ORDER.map(k => `
+          <label class="dcfg-ev"><span>${STAT_NAMES[k]}</span>
+            <input type="number" class="dcfg-num dcfg-ev-in" data-stat="${k}"
+                   min="0" max="${EV_MAX_STAT}" step="4" value="0"/>
+          </label>`).join("")}
+      </div>
+    </div>`;
+
+  const cfg = duelState.cfg[side];
+  const total = () => STAT_ORDER.reduce((t, k) => t + (cfg.evs[k] || 0), 0);
+  const paintTotal = () => {
+    const el = host.querySelector(".dcfg-ev-total");
+    el.textContent = total();
+    el.classList.toggle("over", total() > EV_MAX_TOTAL);
+  };
+
+  host.querySelector(".dcfg-nature").addEventListener("change", e => {
+    cfg.nature = e.target.value; runBattle();
+  });
+  host.querySelector(".dcfg-item").addEventListener("change", e => {
+    cfg.item = e.target.value; runBattle();
+  });
+  host.querySelector(".dcfg-status").addEventListener("change", e => {
+    cfg.status = e.target.value; runBattle();
+  });
+  host.querySelector(".dcfg-iv").addEventListener("input", e => {
+    cfg.ivs = clamp(parseInt(e.target.value, 10) || 0, 0, 31);
+    e.target.value = cfg.ivs; runBattle();
+  });
+  host.querySelectorAll(".dcfg-ev-in").forEach(inp => {
+    inp.addEventListener("input", e => {
+      const k = e.target.dataset.stat;
+      let v = clamp(parseInt(e.target.value, 10) || 0, 0, EV_MAX_STAT);
+      // No dejamos pasar del tope global de 510
+      const otros = STAT_ORDER.reduce((t, s) => t + (s === k ? 0 : (cfg.evs[s] || 0)), 0);
+      v = Math.min(v, EV_MAX_TOTAL - otros);
+      cfg.evs[k] = v; e.target.value = v;
+      paintTotal(); runBattle();
+    });
+  });
+  host.querySelector(".dcfg-ev-reset").addEventListener("click", () => {
+    cfg.evs = {};
+    host.querySelectorAll(".dcfg-ev-in").forEach(i => { i.value = 0; });
+    paintTotal(); runBattle();
+  });
+  paintTotal();
+}
+
+async function initDuel() {
   TOOL_INITED.duel = true;
+  await ensureNatures();
+  buildDuelConfig("A");
+  buildDuelConfig("B");
+  $("duelWeather").addEventListener("change", e => {
+    duelState.weather = e.target.value; runBattle();
+  });
+  $("duelCrit").addEventListener("change", e => {
+    duelState.crit = e.target.checked; runBattle();
+  });
   buildPicker($("duelPickerA"), async data => {
     duelState.A = data; duelState.moveA = null;
     renderDuelPreview("A");
@@ -2814,11 +2906,11 @@ function renderDuelPreview(side) {
 
 async function populateDuelMoves(side, atk) {
   const sel = $("duelMove" + side);
-  // Show first 30 moves of the Pokémon
+  // Todos los movimientos que aprende, no solo los 30 primeros: en un
+  // simulador de combate cortar la lista arbitrariamente no tiene sentido.
+  const names = [...new Set(atk.moves.map(m => m.move.name))].sort();
   sel.innerHTML = '<option value="">— Selecciona movimiento —</option>' +
-    atk.moves.slice(0, 30).map(m =>
-      `<option value="${m.move.name}">${prettyName(m.move.name)}</option>`
-    ).join("");
+    names.map(n => `<option value="${n}">${prettyName(n)}</option>`).join("");
   $("duelAtkLabel" + side).textContent = `${atk.name.toUpperCase()} → ${duelState[side === "A" ? "B" : "A"]?.name?.toUpperCase() || "..."}`;
 }
 
@@ -2830,48 +2922,169 @@ async function onMoveSelect(side, moveName) {
   runBattle();
 }
 
-// ──── Actual stat at a given level (IV 31, EV 0, neutral nature) ────
-function actualStat(base, level, isHp = false) {
-  const iv = 31, ev = 0;
-  const numerator = (2 * base + iv + Math.floor(ev / 4)) * level;
-  if (isHp) return Math.floor(numerator / 100) + level + 10;
-  return Math.floor(numerator / 100) + 5;
-}
-function actualStatsFor(pokemon, level) {
-  const map = Object.fromEntries(pokemon.stats.map(s => [s.stat.name, s.base_stat]));
-  return {
-    hp:                actualStat(map.hp                || 0, level, true),
-    attack:            actualStat(map.attack            || 0, level),
-    defense:           actualStat(map.defense           || 0, level),
-    "special-attack":  actualStat(map["special-attack"] || 0, level),
-    "special-defense": actualStat(map["special-defense"]|| 0, level),
-    speed:             actualStat(map.speed             || 0, level),
-  };
+// ════════════════════════════════════════════════════════
+//  NATURALEZAS  ·  ESTADÍSTICAS REALES  ·  DAÑO
+// ════════════════════════════════════════════════════════
+const NATURES_KEY = "natures:v1";
+let NATURES = null;   // [{name, es, up, down}]
+
+async function ensureNatures() {
+  if (NATURES) return NATURES;
+  try {
+    const entry = await idbGet(NATURES_KEY);
+    let rows;
+    if (entry && Date.now() - entry.ts < CACHE_TTL) {
+      rows = entry.data;
+    } else {
+      const query = `query Natures {
+        pokemon_v2_nature(order_by: {id: asc}) {
+          name
+          pokemonV2StatByIncreasedStatId { name }
+          pokemon_v2_stat { name }
+          pokemon_v2_naturenames(where: {language_id: {_eq: 7}}) { name }
+        }
+      }`;
+      const res = await fetch(GRAPHQL_URL, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      if (json.errors) throw new Error("GraphQL");
+      rows = (json.data?.pokemon_v2_nature || []).map(n => ({
+        name: n.name,
+        es:   n.pokemon_v2_naturenames?.[0]?.name || cap(n.name),
+        up:   n.pokemonV2StatByIncreasedStatId?.name || null,
+        down: n.pokemon_v2_stat?.name || null,
+      }));
+      if (rows.length === 0) throw new Error("0 filas");
+      idbSet(NATURES_KEY, { ts: Date.now(), data: rows });
+    }
+    NATURES = rows;
+  } catch {
+    // Sin naturalezas seguimos funcionando: todas cuentan como neutras
+    NATURES = [{ name: "hardy", es: "Fuerte", up: null, down: null }];
+  }
+  return NATURES;
 }
 
-// ──── Pure damage helper (used by battle + verdict) ────
-function calcDamage(atk, def, move, level) {
+function natureByName(name) {
+  return (NATURES || []).find(n => n.name === name) || null;
+}
+function natureMult(nature, statKey) {
+  if (!nature || !nature.up || !nature.down) return 1;
+  if (nature.up === nature.down) return 1;          // las cinco neutras
+  if (nature.up   === statKey) return 1.1;
+  if (nature.down === statKey) return 0.9;
+  return 1;
+}
+
+// Objetos: la API describe su efecto en prosa, no publica los multiplicadores,
+// así que esta tabla es curada a mano a propósito (no sale de PokéAPI).
+const BATTLE_ITEMS = {
+  "":              { label: "Ninguno" },
+  "life-orb":      { label: "Vidasfera (×1.3, 10% retroceso)", mult: 1.3, recoilPct: 10 },
+  "choice-band":   { label: "Cinta Elegida (×1.5 Ataque)",     atk: 1.5 },
+  "choice-specs":  { label: "Gafas Elegidas (×1.5 At. Esp.)",  spa: 1.5 },
+  "expert-belt":   { label: "Cinta Experto (×1.2 si es eficaz)", superMult: 1.2 },
+  "muscle-band":   { label: "Cinta Fuerte (×1.1 físico)",      physMult: 1.1 },
+  "wise-glasses":  { label: "Gafas Especiales (×1.1 especial)", specMult: 1.1 },
+};
+const STATUS_OPTS = {
+  "":      "Sin estado",
+  "burn":  "Quemadura (×0.5 físico)",
+  "para":  "Parálisis (×0.5 velocidad)",
+};
+
+// Fórmula oficial de estadísticas (gen III+)
+function computeStat(base, level, iv, ev, natMult, isHp) {
+  const core = Math.floor((2 * base + iv + Math.floor(ev / 4)) * level / 100);
+  if (isHp) return core + level + 10;
+  return Math.floor((core + 5) * natMult);
+}
+
+function actualStatsFor(pokemon, level, cfg = {}) {
+  const nature = natureByName(cfg.nature);
+  const iv  = Number.isFinite(cfg.ivs) ? cfg.ivs : 31;
+  const evs = cfg.evs || {};
+  const map = Object.fromEntries(pokemon.stats.map(s => [s.stat.name, s.base_stat]));
+  const out = {};
+  STAT_ORDER.forEach(k => {
+    const isHp = k === "hp";
+    out[k] = computeStat(map[k] || 0, level, iv, evs[k] || 0,
+                         isHp ? 1 : natureMult(nature, k), isHp);
+  });
+  if (cfg.status === "para") out.speed = Math.floor(out.speed * 0.5);
+  return out;
+}
+
+// ──── Cálculo de daño (gen V+) ────
+// Naturaleza, IVs/EVs, objeto, clima, crítico, quemadura, STAB, tipos y los
+// metadatos del movimiento (multigolpe, drenaje/retroceso, estado).
+function calcDamage(atk, def, move, level, opts = {}) {
   if (!move) return null;
   const power = move.power || 0;
   const cat   = move.damage_class?.name || "status";
+  const meta  = move.meta || {};
   if (power === 0 || cat === "status") {
-    return { isStatus: true, moveType: move.type?.name || "???" };
+    return { isStatus: true, moveType: move.type?.name || "???", move, meta,
+             priority: move.priority || 0 };
   }
+  const cfgA = opts.atkCfg || {}, cfgD = opts.defCfg || {};
   const moveType = move.type.name;
-  // Actual battle stats at the chosen level (assume IV 31, EV 0, neutral nature)
-  const atkStats = actualStatsFor(atk, level);
-  const defStats = actualStatsFor(def, level);
-  const A  = cat === "physical" ? atkStats["attack"]  : atkStats["special-attack"];
-  const D  = cat === "physical" ? defStats["defense"] : defStats["special-defense"];
-  const HP = defStats["hp"];
+  const aS = actualStatsFor(atk, level, cfgA);
+  const dS = actualStatsFor(def, level, cfgD);
+
+  let A    = cat === "physical" ? aS.attack : aS["special-attack"];
+  const D  = Math.max(1, cat === "physical" ? dS.defense : dS["special-defense"]);
+  const HP = dS.hp;
+
+  const item = BATTLE_ITEMS[cfgA.item] || {};
+  if (item.atk && cat === "physical") A = Math.floor(A * item.atk);
+  if (item.spa && cat === "special")  A = Math.floor(A * item.spa);
+
   const stab = typeNamesOf(atk).includes(moveType) ? 1.5 : 1;
   const eff  = effectiveness(moveType, typeNamesOf(def));
-  const base =(((2 * level / 5 + 2) * power * A) / Math.max(D, 1)) / 50 + 2;
-  const min  = Math.floor(base * stab * eff * 0.85);
-  const max  = Math.floor(base * stab * eff * 1.0);
-  return { isStatus: false, moveType, cat, power, stab, eff, A, D, HP, min, max,
-           minPct: HP > 0 ? Math.min(100, (min/HP)*100) : 0,
-           maxPct: HP > 0 ? Math.min(100, (max/HP)*100) : 0 };
+  if (eff === 0) {
+    return { isStatus: false, immune: true, moveType, cat, power, eff, HP, move, meta,
+             priority: move.priority || 0, turnsToKO: Infinity };
+  }
+
+  let mods = 1;
+  const weather = opts.weather || "";
+  if (weather === "sun")  mods *= moveType === "fire"  ? 1.5 : moveType === "water" ? 0.5 : 1;
+  if (weather === "rain") mods *= moveType === "water" ? 1.5 : moveType === "fire"  ? 0.5 : 1;
+  if (opts.crit) mods *= 1.5;                                  // gen VI+
+  if (item.mult) mods *= item.mult;
+  if (item.physMult && cat === "physical") mods *= item.physMult;
+  if (item.specMult && cat === "special")  mods *= item.specMult;
+  if (item.superMult && eff > 1) mods *= item.superMult;
+  const burned = cfgA.status === "burn" && cat === "physical";
+  if (burned) mods *= 0.5;
+
+  const base   = Math.floor(Math.floor(Math.floor(2 * level / 5 + 2) * power * A / D) / 50) + 2;
+  const hitMin = Math.max(1, Math.floor(base * stab * eff * mods * 0.85));
+  const hitMax = Math.max(1, Math.floor(base * stab * eff * mods * 1.00));
+
+  const minHits = meta.min_hits || 1;
+  const maxHits = meta.max_hits || 1;
+  const min = hitMin * minHits;
+  const max = hitMax * maxHits;
+  const avg = (min + max) / 2;
+
+  return {
+    isStatus: false, immune: false, moveType, cat, power, stab, eff, A, D, HP,
+    min, max, hitMin, hitMax, minHits, maxHits, multiHit: maxHits > 1,
+    weather, crit: !!opts.crit, burned, item,
+    drain: meta.drain || 0,                    // >0 cura al atacante, <0 retroceso
+    ailment: meta.ailment?.name && meta.ailment.name !== "none" ? meta.ailment.name : null,
+    ailmentChance: meta.ailment_chance || 0,
+    priority: move.priority || 0,
+    turnsToKO: avg > 0 ? Math.ceil(HP / avg) : Infinity,
+    minPct: HP > 0 ? Math.min(100, (min / HP) * 100) : 0,
+    maxPct: HP > 0 ? Math.min(100, (max / HP) * 100) : 0,
+    move, meta,
+  };
 }
 
 // ──── Main battle render pipeline ────
@@ -2900,10 +3113,17 @@ function runBattle() {
 function renderBattleStats(A, B) {
   const body = $("duelStatsBody");
   const order = ["hp","attack","defense","special-attack","special-defense","speed"];
-  // Use actual stats at the current level so the slider has visible effect
-  const sa = actualStatsFor(A, duelState.level);
-  const sb = actualStatsFor(B, duelState.level);
-  let html = `<div class="duel-stats-note">Stats reales al nivel <strong>${duelState.level}</strong> (IV 31, EV 0, naturaleza neutra)</div>`;
+  // Stats reales con la configuración de cada lado (naturaleza, IVs y EVs)
+  const sa = actualStatsFor(A, duelState.level, duelState.cfg.A);
+  const sb = actualStatsFor(B, duelState.level, duelState.cfg.B);
+  const resumen = side => {
+    const c = duelState.cfg[side];
+    const n = natureByName(c.nature);
+    const evs = STAT_ORDER.reduce((t, k) => t + (c.evs[k] || 0), 0);
+    return `${n ? n.es : "—"} · IV ${c.ivs} · ${evs} EVs`;
+  };
+  let html = `<div class="duel-stats-note">Stats reales al nivel <strong>${duelState.level}</strong>
+    — A: ${resumen("A")} · B: ${resumen("B")}</div>`;
   let totalA = 0, totalB = 0;
   order.forEach(key => {
     const va = sa[key] || 0, vb = sb[key] || 0;
@@ -2932,7 +3152,7 @@ function renderBattleStats(A, B) {
   html += `
     <div class="duel-totals">
       <div>
-        <div class="duel-total-side ${totalA > totalB ? "winner" : ""}">${totalA}</div>
+        <div class="duel-total-side ${totalA > totalB ? "winner" : ""}" data-side="A">${totalA}</div>
         <div class="duel-total-label">${A.name.toUpperCase()}</div>
       </div>
       <div class="duel-total-label">TOTAL AL NV. ${duelState.level}</div>
@@ -2984,30 +3204,71 @@ function renderBattleMatchup(A, B) {
     </div>`;
 }
 
+const AILMENT_LABELS = {
+  paralysis:"parálisis", burn:"quemadura", freeze:"congelación", poison:"envenenamiento",
+  sleep:"sueño", confusion:"confusión", infatuation:"enamoramiento", trap:"atrapado",
+  "leech-seed":"drenadoras", flinch:"retroceso", torment:"tormento", disable:"anulación",
+  "yawn":"bostezo", "no-ailment":null,
+};
+
+function damageOptsFor(side) {
+  const other = side === "A" ? "B" : "A";
+  return {
+    atkCfg:  duelState.cfg[side],
+    defCfg:  duelState.cfg[other],
+    weather: duelState.weather,
+    crit:    duelState.crit,
+  };
+}
+
 function renderBattleAttack(side, atk, def, move) {
   const target = $("duelDmg" + side);
   if (!move) {
     target.innerHTML = '<div class="das-empty">Selecciona un movimiento para calcular el daño</div>';
     return;
   }
-  const r = calcDamage(atk, def, move, duelState.level);
+  const r = calcDamage(atk, def, move, duelState.level, damageOptsFor(side));
+
   if (r.isStatus) {
+    const ail = AILMENT_LABELS[r.ailment] || null;
     target.innerHTML = `
       <div class="das-headline">SIN DAÑO</div>
       <div class="das-meta">
         <span>${prettyName(move.name)}</span>
         <span class="type-badge type-${r.moveType}">${r.moveType.toUpperCase()}</span>
         <span>Movimiento de estado</span>
+        ${r.priority ? `<span>Prioridad ${r.priority > 0 ? "+" : ""}${r.priority}</span>` : ""}
       </div>`;
     return;
   }
-  let effLabel = "Daño normal", effClass = "";
-  if (r.eff >= 4)        { effLabel = `¡SUPER eficaz ×${r.eff}!`; effClass = "das-eff-super"; }
-  else if (r.eff >= 2)   { effLabel = `Muy eficaz ×${r.eff}`;       effClass = "das-eff-super"; }
-  else if (r.eff === 0)  { effLabel = `Sin efecto ×0`;              effClass = "das-eff-none"; }
-  else if (r.eff < 1)    { effLabel = `Poco eficaz ×${r.eff}`;      effClass = "das-eff-not"; }
+  if (r.immune) {
+    target.innerHTML = `
+      <div class="das-headline">SIN EFECTO</div>
+      <div class="das-meta">
+        <span class="type-badge type-${r.moveType}">${r.moveType.toUpperCase()}</span>
+        <span>${prettyName(move.name)}</span>
+        <span class="das-eff-none">${cap(def.name)} es inmune (×0)</span>
+      </div>`;
+    return;
+  }
 
-  const ko = r.minPct >= 100 ? "💀 K.O. SEGURO" : r.maxPct >= 100 ? "⚠ POSIBLE K.O." : "";
+  let effLabel = "Daño normal", effClass = "";
+  if (r.eff >= 4)      { effLabel = `¡SUPER eficaz ×${r.eff}!`; effClass = "das-eff-super"; }
+  else if (r.eff >= 2) { effLabel = `Muy eficaz ×${r.eff}`;      effClass = "das-eff-super"; }
+  else if (r.eff < 1)  { effLabel = `Poco eficaz ×${r.eff}`;     effClass = "das-eff-not"; }
+
+  const ko = r.minPct >= 100 ? "💀 K.O. SEGURO"
+           : r.maxPct >= 100 ? "⚠ POSIBLE K.O."
+           : `Necesita ~${r.turnsToKO} turno${r.turnsToKO === 1 ? "" : "s"}`;
+
+  const extras = [];
+  if (r.multiHit) extras.push(`Multigolpe ×${r.minHits}–${r.maxHits} (${r.hitMin}–${r.hitMax} por golpe)`);
+  if (r.drain > 0)  extras.push(`Drena el ${r.drain}% del daño`);
+  if (r.drain < 0)  extras.push(`Retroceso ${Math.abs(r.drain)}% del daño`);
+  if (r.item.recoilPct) extras.push(`${r.item.label.split(" (")[0]}: −${r.item.recoilPct}% PS propios`);
+  const ail = AILMENT_LABELS[r.ailment];
+  if (ail && r.ailmentChance > 0) extras.push(`${r.ailmentChance}% de ${ail}`);
+  if (r.burned) extras.push("Quemado: daño físico a la mitad");
 
   target.innerHTML = `
     <div class="das-headline">${r.min} – ${r.max} HP</div>
@@ -3021,18 +3282,72 @@ function renderBattleAttack(side, atk, def, move) {
       <span>Pot. ${r.power}</span>
       <span>${r.cat === "physical" ? "Físico" : "Especial"}</span>
       ${r.stab === 1.5 ? '<span>STAB ×1.5</span>' : ''}
+      ${r.priority ? `<span>Prioridad ${r.priority > 0 ? "+" : ""}${r.priority}</span>` : ""}
+      ${r.crit ? '<span>Crítico ×1.5</span>' : ''}
+      ${r.weather === "sun"  ? '<span>☀ Sol</span>'    : ''}
+      ${r.weather === "rain" ? '<span>🌧 Lluvia</span>' : ''}
       <span class="${effClass}">${effLabel}</span>
     </div>
-    ${ko ? `<div class="das-ko">${ko}</div>` : ""}`;
+    ${extras.length ? `<ul class="das-extras">${extras.map(x => `<li>${x}</li>`).join("")}</ul>` : ""}
+    <div class="das-ko">${ko}</div>`;
 }
 
 function renderBattleVerdict(A, B) {
   const body = $("duelVerdictBody");
-  // Actual stats at current level — same scaling for both sides, but feels right with the slider
-  const sa = actualStatsFor(A, duelState.level);
-  const sb = actualStatsFor(B, duelState.level);
+  const sa = actualStatsFor(A, duelState.level, duelState.cfg.A);
+  const sb = actualStatsFor(B, duelState.level, duelState.cfg.B);
 
-  // Speed
+  // ── Con ambos movimientos elegidos hacemos la cuenta de verdad:
+  //    quién ataca primero (prioridad, luego velocidad) y quién deja K.O. antes.
+  const dA = duelState.moveA ? calcDamage(A, B, duelState.moveA, duelState.level, damageOptsFor("A")) : null;
+  const dB = duelState.moveB ? calcDamage(B, A, duelState.moveB, duelState.level, damageOptsFor("B")) : null;
+
+  if (dA && dB) {
+    const prA = dA.priority || 0, prB = dB.priority || 0;
+    const primero = prA !== prB ? (prA > prB ? "A" : "B")
+                  : sa.speed !== sb.speed ? (sa.speed > sb.speed ? "A" : "B") : "tie";
+    const motivo = prA !== prB
+      ? `por prioridad (${prA > 0 ? "+" : ""}${prA} vs ${prB > 0 ? "+" : ""}${prB})`
+      : `por velocidad (${sa.speed} vs ${sb.speed})`;
+
+    const tA = dA.turnsToKO, tB = dB.turnsToKO;
+    const txt = t => t === Infinity ? "nunca" : `${t} turno${t === 1 ? "" : "s"}`;
+
+    let ganador = "tie", explica;
+    if (tA < tB)      { ganador = "A"; explica = `deja K.O. en ${txt(tA)} frente a ${txt(tB)}`; }
+    else if (tB < tA) { ganador = "B"; explica = `deja K.O. en ${txt(tB)} frente a ${txt(tA)}`; }
+    else if (primero !== "tie") { ganador = primero; explica = `mismos turnos (${txt(tA)}), decide quién ataca primero`; }
+    else              { explica = `mismos turnos (${txt(tA)}) y misma velocidad`; }
+
+    const nombre = s => (s === "A" ? A.name : B.name).toUpperCase();
+    const cellKO = (side, d, t) => `
+      <div class="dv-cell">
+        <div class="dv-label">${side === "A" ? "A → B" : "B → A"}</div>
+        <div class="dv-winner side-${side}">${txt(t)}</div>
+        <div class="dv-detail">${prettyName(d.move.name)} · ${d.immune ? "sin efecto" : `${d.min}–${d.max} HP`}</div>
+      </div>`;
+
+    body.innerHTML = `
+      ${cellKO("A", dA, tA)}
+      ${cellKO("B", dB, tB)}
+      <div class="dv-cell">
+        <div class="dv-label">⚡ ATACA PRIMERO</div>
+        <div class="dv-winner ${primero === "tie" ? "tie" : "side-" + primero}">
+          ${primero === "tie" ? "EMPATE" : nombre(primero)}
+        </div>
+        <div class="dv-detail">${motivo}</div>
+      </div>
+      <div class="dv-final">
+        <div class="dv-label">VEREDICTO CON ESTOS MOVIMIENTOS</div>
+        <div class="dv-winner ${ganador === "tie" ? "tie" : "side-" + ganador}">
+          ${ganador === "tie" ? "🤝 COMBATE PAREJO" : "🏆 " + nombre(ganador)}
+        </div>
+        <div class="dv-detail">${ganador === "tie" ? explica : `${nombre(ganador)} ${explica}`}</div>
+      </div>`;
+    return;
+  }
+
+  // ── Sin movimientos elegidos: estimación por estadísticas y tipos ──
   const speedWinner = sa.speed > sb.speed ? "A" : sa.speed < sb.speed ? "B" : "tie";
   // Bulk (HP × avg(Def, SpDef))
   const bulkA = sa.hp * (sa.defense + sa["special-defense"]) / 2;
@@ -3078,11 +3393,14 @@ function renderBattleVerdict(A, B) {
     ${cell("⚔️ OFENSIVA", offWinner,  `${offA} vs ${offB} (mejor stat ofensivo)`)}
     ${cell("🔥 VENTAJA DE TIPO", typeWinner, `${supA} vs ${supB} tipos super-eficaces`)}
     <div class="dv-final">
-      <div class="dv-label">VEREDICTO FINAL</div>
+      <div class="dv-label">VEREDICTO ESTIMADO</div>
       <div class="dv-winner ${finalWinner === "tie" ? "tie" : "side-" + finalWinner}">
         ${finalWinner === "tie" ? "🤝 COMBATE PAREJO" : "🏆 " + (finalWinner === "A" ? A.name : B.name).toUpperCase()}
       </div>
-      <div class="dv-detail">Puntaje: ${sA} a ${sB} (basado en velocidad, aguante, ofensiva y tipos)</div>
+      <div class="dv-detail">
+        Puntaje: ${sA} a ${sB} (velocidad, aguante, ofensiva y tipos).
+        Elige un movimiento en cada lado para calcular turnos hasta el K.O.
+      </div>
     </div>`;
 }
 

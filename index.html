@@ -380,6 +380,7 @@
               <div class="duel-preview" id="duelPreviewA">
                 <span class="duel-empty">Selecciona un Pokémon</span>
               </div>
+              <div class="duel-cfg" id="duelCfgA"></div>
             </div>
             <div class="duel-vs">VS</div>
             <div class="duel-slot" data-side="B">
@@ -388,12 +389,26 @@
               <div class="duel-preview" id="duelPreviewB">
                 <span class="duel-empty">Selecciona un Pokémon</span>
               </div>
+              <div class="duel-cfg" id="duelCfgB"></div>
             </div>
           </div>
 
           <div class="duel-level-bar hidden" id="duelLevelBar">
             <label>NIVEL DE COMBATE: <span id="duelLvlVal">50</span></label>
             <input type="range" id="duelLvl" min="1" max="100" value="50" class="dmg-lvl"/>
+            <div class="duel-field-cfg">
+              <label class="dfc-item">CLIMA
+                <select id="duelWeather" class="dcfg-sel">
+                  <option value="">Sin clima</option>
+                  <option value="sun">☀ Sol</option>
+                  <option value="rain">🌧 Lluvia</option>
+                </select>
+              </label>
+              <label class="dfc-check">
+                <input type="checkbox" id="duelCrit"/>
+                <span>Golpe crítico (×1.5)</span>
+              </label>
+            </div>
           </div>
 
           <!-- Section: stats comparison -->

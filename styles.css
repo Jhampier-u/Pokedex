@@ -2452,6 +2452,101 @@ kbd {
 }
 
 /* ══════════════════════════════════════
+   CONFIGURACIÓN DE COMBATE
+══════════════════════════════════════ */
+.duel-cfg { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+.dcfg-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+}
+.dcfg-f {
+  display: flex; flex-direction: column; gap: 4px;
+  font-family: nintendo-DS;
+  font-size: 10px;
+  color: rgba(255,248,231,0.45);
+  letter-spacing: 1.5px;
+}
+.dcfg-sel, .dcfg-num {
+  font-family: nintendo-DS;
+  font-size: 12px;
+  background: #161616;
+  border: 2px solid #333;
+  border-radius: 4px;
+  color: var(--cream);
+  padding: 7px 8px;
+  letter-spacing: 0.5px;
+  width: 100%;
+}
+.dcfg-sel:focus, .dcfg-num:focus { border-color: var(--yellow); outline: none; }
+
+.dcfg-evs {
+  background: #0d0d0d;
+  border: 2px solid #262626;
+  border-radius: 4px;
+  padding: 9px 10px;
+}
+.dcfg-evs-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  font-family: nintendo-DS;
+  font-size: 11px;
+  color: rgba(255,248,231,0.5);
+  letter-spacing: 1.5px;
+  margin-bottom: 8px;
+}
+.dcfg-ev-total { color: var(--yellow); }
+.dcfg-ev-total.over { color: #FF8888; }
+.dcfg-ev-reset {
+  font-family: nintendo-DS; font-size: 12px;
+  background: none; border: 2px solid #333; border-radius: 4px;
+  color: rgba(255,248,231,0.5); cursor: pointer; padding: 2px 8px;
+}
+.dcfg-ev-reset:hover { border-color: var(--yellow); color: var(--yellow); }
+.dcfg-ev-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
+}
+.dcfg-ev {
+  display: flex; flex-direction: column; gap: 3px;
+  font-family: nintendo-DS; font-size: 9px;
+  color: rgba(255,248,231,0.4); letter-spacing: 1px;
+}
+.dcfg-ev .dcfg-num { padding: 5px 6px; font-size: 11px; }
+
+.duel-field-cfg {
+  display: flex; flex-wrap: wrap; align-items: flex-end; gap: 16px;
+  margin-top: 12px;
+}
+.dfc-item {
+  display: flex; flex-direction: column; gap: 4px;
+  font-family: nintendo-DS; font-size: 10px;
+  color: rgba(255,248,231,0.45); letter-spacing: 1.5px;
+  min-width: 130px;
+}
+.dfc-check {
+  display: flex; align-items: center; gap: 7px;
+  font-family: nintendo-DS; font-size: 12px;
+  color: rgba(255,248,231,0.7); letter-spacing: 1px;
+  cursor: pointer;
+}
+
+.das-extras {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.das-extras li {
+  font-size: 12px;
+  color: rgba(255,248,231,0.6);
+  letter-spacing: 0.5px;
+  padding-left: 12px;
+  position: relative;
+}
+.das-extras li::before {
+  content: "›"; position: absolute; left: 0; color: var(--yellow);
+}
+
+/* ══════════════════════════════════════
    MODO GENERACIÓN · DATOS · TOAST
 ══════════════════════════════════════ */
 .gen-note {
