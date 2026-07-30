@@ -935,6 +935,99 @@ body {
   padding: 8px 16px;
   color: rgba(255,248,231,0.85);
   letter-spacing: 1px; text-transform: capitalize;
+  display: inline-flex; align-items: center; gap: 8px;
+}
+.moves-empty {
+  color: rgba(255,248,231,0.3);
+  font-size: 13px; letter-spacing: 1.5px;
+}
+.move-lv {
+  font-size: 12px;
+  color: #0c0c0c;
+  background: var(--yellow);
+  border-radius: 3px;
+  padding: 2px 6px;
+  letter-spacing: 0.5px;
+  text-transform: none;
+  flex-shrink: 0;
+}
+
+/* — Pestañas de método de aprendizaje — */
+.move-method-tabs {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin-bottom: 12px;
+}
+.mm-tab {
+  font-family: nintendo-DS;
+  font-size: 12px;
+  background: #0e0e0e;
+  border: 2px solid #2a2a2a;
+  border-radius: 4px;
+  color: rgba(255,248,231,0.55);
+  padding: 7px 13px;
+  letter-spacing: 1.5px;
+  cursor: pointer;
+  display: inline-flex; align-items: center; gap: 7px;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.mm-tab:hover { border-color: #4a4a4a; color: rgba(255,248,231,0.85); }
+.mm-tab.active {
+  border-color: var(--yellow);
+  color: var(--yellow);
+  background: #1a1500;
+}
+.mm-count {
+  font-size: 11px;
+  background: rgba(255,255,255,0.09);
+  border-radius: 8px;
+  padding: 1px 7px;
+  color: inherit;
+}
+
+/* — Crianza y captura — */
+.breed-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(165px, 1fr));
+  gap: 9px;
+}
+.breed-tags {
+  grid-column: 1 / -1;
+  display: flex; flex-wrap: wrap; gap: 7px;
+}
+.breed-tag {
+  font-family: nintendo-DS;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  padding: 4px 11px;
+  border-radius: 3px;
+  border: 2px solid;
+}
+.breed-tag.legendary { color: #FFD700; border-color: #FFD700; background: rgba(255,215,0,0.09); }
+.breed-tag.mythical  { color: #FF8AD8; border-color: #FF8AD8; background: rgba(255,138,216,0.09); }
+.breed-tag.baby      { color: #8FD8FF; border-color: #8FD8FF; background: rgba(143,216,255,0.09); }
+.breed-cell {
+  background: #111;
+  border: 2px solid #2a2a2a;
+  border-radius: 4px;
+  padding: 9px 12px;
+  display: flex; flex-direction: column; gap: 3px;
+}
+.breed-label {
+  font-family: nintendo-DS;
+  font-size: 11px;
+  color: rgba(255,248,231,0.45);
+  letter-spacing: 1.5px;
+}
+.breed-val {
+  font-size: 16px;
+  color: var(--cream);
+  letter-spacing: 0.5px;
+}
+.breed-hint {
+  font-size: 11px;
+  color: var(--yellow);
+  opacity: 0.75;
+  letter-spacing: 0.5px;
 }
 
 /* ══════════════════════════════════════
@@ -1961,12 +2054,6 @@ kbd {
 }
 .duel-types { display: flex; gap: 6px; }
 
-.duel-results {
-  background: #111;
-  border: 3px solid var(--darker);
-  border-radius: 10px;
-  padding: 24px;
-}
 .duel-stat-row {
   display: grid;
   grid-template-columns: 1fr 80px 1fr;
@@ -2188,57 +2275,8 @@ kbd {
 .tc-cell.safe       { opacity: 0.4; }
 
 /* ══════════════════════════════════════
-   DAMAGE  CALC
+   CONTROLES DE ATAQUE  (usados por BATALLA)
 ══════════════════════════════════════ */
-.dmg-wrap { max-width: 800px; margin: 30px auto; padding: 0 20px; }
-.dmg-form {
-  background: #111;
-  border: 3px solid var(--darker);
-  border-radius: 10px;
-  padding: 22px;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 18px;
-}
-.dmg-field {
-  display: flex; flex-direction: column; gap: 8px;
-}
-.dmg-field > label {
-  font-family: nintendo-DS;
-  font-size: 12px;
-  color: var(--yellow);
-  letter-spacing: 2px;
-}
-.dmg-field.full { grid-column: 1 / -1; }
-.dmg-form > .dmg-field:nth-child(3),
-.dmg-form > .dmg-field:nth-child(4) { grid-column: 1 / -1; }
-.dmg-mini-preview {
-  background: #0a0a0a;
-  border: 2px solid #2a2a2a;
-  border-radius: 4px;
-  padding: 8px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 56px;
-}
-.dmg-mini-preview img {
-  width: 48px; height: 48px;
-  image-rendering: pixelated;
-}
-.dmg-mini-name {
-  font-family: nintendo-DS;
-  font-size: 14px;
-  color: var(--cream);
-  text-transform: capitalize;
-  letter-spacing: 0.5px;
-}
-.dmg-mini-types {
-  display: flex; gap: 4px; margin-top: 4px;
-}
-.dmg-mini-types .type-badge { font-size: 9px; padding: 2px 7px; }
-.dmg-mini-empty { color: rgba(255,248,231,0.3); font-size: 12px; letter-spacing: 1.5px; }
-
 .dmg-move-sel {
   font-family: nintendo-DS;
   font-size: 14px;
@@ -2280,80 +2318,6 @@ kbd {
   cursor: pointer;
   box-shadow: 0 0 10px rgba(255,215,0,0.4);
 }
-
-.dmg-results {
-  margin-top: 22px;
-  background: linear-gradient(180deg, #111, #060606);
-  border: 3px solid var(--darker);
-  border-radius: 10px;
-  padding: 24px;
-}
-.dmg-result-headline {
-  font-family: poke-solid;
-  font-size: 28px;
-  color: var(--yellow);
-  text-align: center;
-  text-shadow: 2px 2px 0 rgba(0,0,0,0.5);
-  letter-spacing: 2px;
-  margin-bottom: 12px;
-}
-.dmg-eff-line {
-  text-align: center;
-  font-family: nintendo-DS;
-  font-size: 14px;
-  letter-spacing: 2px;
-  margin-bottom: 18px;
-}
-.dmg-eff-line.eff-super  { color: #88FF88; }
-.dmg-eff-line.eff-not    { color: #FFAA88; }
-.dmg-eff-line.eff-none   { color: #888; }
-.dmg-eff-line.eff-normal { color: rgba(255,248,231,0.6); }
-.dmg-range-bar {
-  height: 28px;
-  background: #0a0a0a;
-  border: 2px solid #222;
-  border-radius: 5px;
-  position: relative;
-  overflow: hidden;
-  margin-bottom: 16px;
-}
-.dmg-range-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #FFD700, #FF8030);
-  position: absolute;
-  left: 0; top: 0;
-  border-radius: 5px;
-  transition: width 0.6s ease;
-}
-.dmg-range-text {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: nintendo-DS;
-  font-size: 14px;
-  color: white;
-  text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
-  letter-spacing: 1px;
-}
-.dmg-breakdown {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-  margin-top: 12px;
-}
-.dmg-row {
-  display: flex; justify-content: space-between;
-  background: #161616;
-  padding: 8px 12px;
-  border: 2px solid #2a2a2a;
-  border-radius: 4px;
-  font-family: nintendo-DS;
-  font-size: 12px;
-}
-.dmg-row span:first-child { color: rgba(255,248,231,0.5); letter-spacing: 1px; }
-.dmg-row span:last-child  { color: var(--yellow); letter-spacing: 1px; }
 
 /* ══════════════════════════════════════
    ROULETTE
@@ -2485,6 +2449,85 @@ kbd {
   color: rgba(255,248,231,0.3);
   font-size: 14px;
   letter-spacing: 2px;
+}
+
+/* ══════════════════════════════════════
+   MODO GENERACIÓN · DATOS · TOAST
+══════════════════════════════════════ */
+.gen-note {
+  width: 100%;
+  background: rgba(255,215,0,0.07);
+  border: 2px solid rgba(255,215,0,0.35);
+  border-radius: 4px;
+  padding: 7px 11px;
+  font-size: 12px;
+  color: var(--yellow);
+  letter-spacing: 0.5px;
+  line-height: 1.5;
+}
+.gen-note b { color: var(--cream); }
+
+/* Viñeteado sutil cuando estás viendo reglas antiguas */
+body.retro-gen .pokedex-card { box-shadow: inset 0 0 0 2px rgba(255,215,0,0.18); }
+
+.data-desc {
+  font-size: 13px;
+  color: rgba(255,248,231,0.6);
+  line-height: 1.6;
+  margin-bottom: 18px;
+}
+.data-actions {
+  display: flex; flex-wrap: wrap; gap: 10px;
+}
+.data-btn {
+  font-family: nintendo-DS;
+  font-size: 13px;
+  background: #161616;
+  border: 2px solid #383838;
+  border-radius: 4px;
+  color: var(--cream);
+  padding: 11px 16px;
+  letter-spacing: 1.5px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.data-btn:hover { border-color: var(--yellow); color: var(--yellow); background: #1a1500; }
+.data-status {
+  margin-top: 16px;
+  font-size: 12px;
+  color: var(--yellow);
+  letter-spacing: 0.5px;
+  min-height: 18px;
+}
+.data-err { color: #FF8888; }
+
+.toast {
+  position: fixed;
+  left: 50%; bottom: 26px;
+  transform: translateX(-50%) translateY(14px);
+  background: #111;
+  border: 2px solid var(--yellow);
+  border-radius: 5px;
+  color: var(--yellow);
+  font-family: nintendo-DS;
+  font-size: 13px;
+  letter-spacing: 1.5px;
+  padding: 11px 20px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 9999;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+.rou-note {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 14px 20px;
+  color: rgba(255,248,231,0.45);
+  font-size: 12px;
+  letter-spacing: 1px;
+  border-top: 1px solid rgba(255,248,231,0.08);
 }
 
 /* ══════════════════════════════════════

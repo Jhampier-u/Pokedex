@@ -6,6 +6,10 @@
   <title>Pokédex</title>
   <link rel="stylesheet" href="styles.css" />
   <link rel="icon" type="image/png" href="Pokeball_PixelArt_Transparent.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#E3350D">
+  <meta name="description" content="Pokédex Nacional con carrusel, simulador de batalla, constructor de equipo y Pokédex personal.">
+  <link rel="apple-touch-icon" href="Pokeball_PixelArt_Transparent.png">
 </head>
 <body>
 
@@ -237,6 +241,7 @@
               </div>
             </div>
             <div class="types-row" id="typesRow"></div>
+            <div class="gen-note hidden" id="genNote"></div>
             <div class="varieties-wrap hidden" id="varietiesWrap">
               <div class="varieties-label">▸ FORMAS</div>
               <div class="varieties-list" id="varietiesList"></div>
@@ -287,7 +292,15 @@
               <div class="stats-list" id="pokeStats"></div>
             </div>
             <div class="section-block">
-              <div class="section-title">◆ MOVIMIENTOS <small class="section-hint">(click para detalle)</small></div>
+              <div class="section-title">◆ CRIANZA Y CAPTURA</div>
+              <div class="breed-grid" id="breedGrid"></div>
+            </div>
+            <div class="section-block">
+              <div class="section-title-row">
+                <div class="section-title">◆ MOVIMIENTOS <small class="section-hint">(click para detalle)</small></div>
+                <select class="version-sel" id="moveVersionSel" title="Juego"></select>
+              </div>
+              <div class="move-method-tabs" id="moveMethodTabs"></div>
               <div class="moves-list" id="pokeMoves"></div>
             </div>
             <div class="section-block">

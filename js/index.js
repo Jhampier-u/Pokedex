@@ -54,6 +54,97 @@ const TYPE_CHART = {
   steel:    { fire: 0.5, water: 0.5, electric: 0.5, ice: 2, rock: 2, steel: 0.5, fairy: 2 },
   fairy:    { fire: 0.5, fighting: 2, poison: 0.5, dragon: 2, dark: 2, steel: 0.5 },
 };
+// Multiplicador de daño de un tipo atacante contra uno o dos tipos defensores.
+// Fuente única: esta misma multiplicación estaba copiada en 6 sitios
+// (debilidades, duelo, cálculo de daño, veredicto y cobertura del equipo).
+// La tabla vigente. En "época actual" es TYPE_CHART; en modo generación se
+// sustituye por la que devuelve la API para esa época (ver chartForGeneration).
+let activeChart = TYPE_CHART;
+
+function effectiveness(attackType, defenderTypes) {
+  const row = activeChart[attackType];
+  if (!row) return 1;
+  let mult = 1;
+  for (const d of defenderTypes) {
+    const x = row[d];
+    if (x !== undefined) mult *= x;
+  }
+  return mult;
+}
+// Tipos que existen en la época activa (gen 1 no tenía Siniestro/Acero/Hada)
+const activeTypes = () => Object.keys(activeChart);
+// Nombres de tipo de un Pokémon de la API → ["fire","flying"]
+const typeNamesOf = pokemon => pokemon.types.map(t => t.type.name);
+
+// ════════════════════════════════════════════════════════
+//  MODO GENERACIÓN  (tabla de tipos y tipados históricos)
+//  La API guarda cómo era la tabla en cada época en
+//  type.past_damage_relations, y el tipado antiguo de cada Pokémon en
+//  pokemon.past_types. En ambos casos la "generation" indica la ÚLTIMA
+//  generación en la que esas reglas seguían vigentes.
+// ════════════════════════════════════════════════════════
+const CURRENT_GEN = 9;
+const GEN_ROMAN   = { i:1, ii:2, iii:3, iv:4, v:5, vi:6, vii:7, viii:8, ix:9 };
+const genNumber   = name => GEN_ROMAN[String(name).replace("generation-", "")] || CURRENT_GEN;
+const GEN_LABELS  = {
+  1:"Gen I · Kanto", 2:"Gen II · Johto", 3:"Gen III · Hoenn", 4:"Gen IV · Sinnoh",
+  5:"Gen V · Unova", 6:"Gen VI · Kalos", 7:"Gen VII · Alola", 8:"Gen VIII · Galar",
+  9:"Actual (Gen IX)",
+};
+
+function relationsToRow(rel) {
+  const row = {};
+  rel.double_damage_to.forEach(t => { row[t.name] = 2; });
+  rel.half_damage_to.forEach(t   => { row[t.name] = 0.5; });
+  rel.no_damage_to.forEach(t     => { row[t.name] = 0; });
+  return row;
+}
+
+const typeInfoCache = {};
+async function ensureTypeInfo() {
+  const names = Object.keys(TYPE_CHART);
+  if (names.every(n => typeInfoCache[n])) return true;
+  try {
+    await Promise.all(names.map(async n => {
+      if (typeInfoCache[n]) return;
+      const d = await apiFetch(`https://pokeapi.co/api/v2/type/${n}`);
+      typeInfoCache[n] = {
+        gen:     genNumber(d.generation.name),
+        current: d.damage_relations,
+        past:    (d.past_damage_relations || [])
+                   .map(p => ({ gen: genNumber(p.generation.name), rel: p.damage_relations }))
+                   .sort((a, b) => a.gen - b.gen),
+      };
+    }));
+    return true;
+  } catch { return false; }
+}
+
+function chartForGeneration(g) {
+  if (g >= CURRENT_GEN) return TYPE_CHART;
+  const chart = {};
+  Object.entries(typeInfoCache).forEach(([name, info]) => {
+    if (info.gen > g) return;                       // ese tipo aún no existía
+    const past = info.past.find(p => p.gen >= g);   // primera época que cubre g
+    const row  = relationsToRow(past ? past.rel : info.current);
+    Object.keys(row).forEach(def => {               // ni el defensor
+      if (typeInfoCache[def] && typeInfoCache[def].gen > g) delete row[def];
+    });
+    chart[name] = row;
+  });
+  return chart;
+}
+
+// Tipado de un Pokémon en una generación concreta
+function typesForGeneration(data, g) {
+  if (g >= CURRENT_GEN || !data.past_types?.length) return data.types;
+  const past = data.past_types
+    .map(p => ({ gen: genNumber(p.generation.name), types: p.types }))
+    .sort((a, b) => a.gen - b.gen)
+    .find(p => p.gen >= g);
+  return past ? past.types : data.types;
+}
+
 const TYPE_LABELS_ES = {
   normal:"NORMAL", fire:"FUEGO", water:"AGUA", grass:"PLANTA", electric:"ELÉCTRICO",
   ice:"HIELO", fighting:"LUCHA", poison:"VENENO", ground:"TIERRA", flying:"VOLADOR",
@@ -102,6 +193,8 @@ const state = {
   shinyMode:    false,
   animatedMode: false,
   musicOn:      false,
+  mode:         "pokedex",  // modo activo (pokedex · quiz · duel · team · roulette)
+  gen:          9,          // época activa: 9 = reglas actuales
   currentRegion: "kanto",
   currentVariety: null,    // alternate-form override (pokemon name); null = default
 };
@@ -171,13 +264,33 @@ const clamp = (v, mn, mx) => Math.max(mn, Math.min(mx, v));
 
 function spriteFor(id, { shiny = false, animated = false } = {}) {
   const base = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon";
-  if (animated && id <= 649) {
-    return shiny
-      ? `${base}/versions/generation-v/black-white/animated/shiny/${id}.gif`
-      : `${base}/versions/generation-v/black-white/animated/${id}.gif`;
+  if (animated) {
+    // Gen I-V tienen los GIF de Blanco/Negro. Para el resto tiramos de los
+    // sprites de Showdown, que llegan casi hasta gen 9 — pero no están todos
+    // (p. ej. el 1025 da 404), así que el onerror del <img> cae al PNG estático.
+    if (id <= 649) {
+      return shiny
+        ? `${base}/versions/generation-v/black-white/animated/shiny/${id}.gif`
+        : `${base}/versions/generation-v/black-white/animated/${id}.gif`;
+    }
+    return shiny ? `${base}/other/showdown/shiny/${id}.gif`
+                 : `${base}/other/showdown/${id}.gif`;
   }
   return shiny ? `${base}/shiny/${id}.png` : `${base}/${id}.png`;
 }
+// Asigna el sprite a un <img> con fallback controlado: si el GIF animado no
+// existe (Showdown no cubre el 100% de gen 9) cae al PNG estático. Un solo
+// reintento por imagen, así que no puede entrar en bucle de errores.
+function applySprite(img, id, opts = {}) {
+  img.dataset.fallback = "0";
+  img.onerror = () => {
+    if (img.dataset.fallback === "1") { img.onerror = null; return; }
+    img.dataset.fallback = "1";
+    img.src = spriteFor(id, { shiny: opts.shiny });
+  };
+  img.src = spriteFor(id, opts);
+}
+
 function officialArtFor(id, shiny = false) {
   const base = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork";
   return shiny ? `${base}/shiny/${id}.png` : `${base}/${id}.png`;
@@ -202,6 +315,71 @@ function regionForId(id) {
 }
 
 // ════════════════════════════════════════════════════════
+//  CACHÉ PERSISTENTE  (IndexedDB)
+//  La fair-use policy de PokéAPI pide explícitamente cachear en local todo lo
+//  que se solicite. Los datos son estáticos, así que guardamos las respuestas
+//  y solo salimos a la red la primera vez. Si IndexedDB falla o no existe,
+//  degrada a un fetch normal sin romper nada.
+// ════════════════════════════════════════════════════════
+const IDB_NAME    = "pokedex-cache";
+const IDB_STORE   = "api";
+const IDB_VERSION = 1;
+const CACHE_TTL   = 30 * 24 * 3600 * 1000;   // 30 días
+
+let idbPromise = null;
+function idb() {
+  if (idbPromise) return idbPromise;
+  idbPromise = new Promise(resolve => {
+    if (!("indexedDB" in window)) return resolve(null);
+    let req;
+    try { req = indexedDB.open(IDB_NAME, IDB_VERSION); } catch { return resolve(null); }
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE);
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror   = () => resolve(null);
+  });
+  return idbPromise;
+}
+function idbGet(key) {
+  return idb().then(db => new Promise(resolve => {
+    if (!db) return resolve(undefined);
+    try {
+      const r = db.transaction(IDB_STORE, "readonly").objectStore(IDB_STORE).get(key);
+      r.onsuccess = () => resolve(r.result);
+      r.onerror   = () => resolve(undefined);
+    } catch { resolve(undefined); }
+  }));
+}
+function idbSet(key, value) {
+  return idb().then(db => {
+    if (!db) return;
+    try { db.transaction(IDB_STORE, "readwrite").objectStore(IDB_STORE).put(value, key); }
+    catch {}
+  });
+}
+
+// Fetch a la API con caché persistente + deduplicación de peticiones en vuelo
+// (dos sitios pidiendo el mismo recurso a la vez comparten una sola llamada).
+const inflight = new Map();
+async function apiFetch(url) {
+  const hit = await idbGet(url);
+  if (hit && Date.now() - hit.ts < CACHE_TTL) return hit.data;
+
+  if (inflight.has(url)) return inflight.get(url);
+  const p = (async () => {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status} en ${url}`);
+    const data = await res.json();
+    idbSet(url, { ts: Date.now(), data });
+    return data;
+  })().finally(() => inflight.delete(url));
+  inflight.set(url, p);
+  return p;
+}
+
+// ════════════════════════════════════════════════════════
 //  INTRO
 // ════════════════════════════════════════════════════════
 window.addEventListener("load", () => {
@@ -216,22 +394,30 @@ window.addEventListener("load", () => {
 // ════════════════════════════════════════════════════════
 //  CATALOG
 // ════════════════════════════════════════════════════════
+// Los modos quiz/duelo/equipo/ruleta leen state.allPokemon; si se abren antes
+// de que llegue el catálogo revientan (y como TOOL_INITED ya quedó marcado,
+// se quedaban rotos hasta recargar). Esperan a esta promesa.
+let markCatalogReady;
+const catalogReady = new Promise(res => { markCatalogReady = res; });
+
 async function loadCatalog() {
   catalogLoading.classList.remove("hidden");
   catalogError.classList.add("hidden");
   try {
-    const res = await fetch("https://pokeapi.co/api/v2/pokemon?limit=1025&offset=0");
-    if (!res.ok) throw new Error("fetch_failed");
-    const data = await res.json();
+    const data = await apiFetch("https://pokeapi.co/api/v2/pokemon?limit=1025&offset=0");
     state.allPokemon = data.results.map(p => ({ id: getId(p.url), name: p.name }));
     catalogLoading.classList.add("hidden");
     pagTotal.textContent = state.allPokemon.length;
     pdexRenderRecent();
     pdexRenderProgress();
+    markCatalogReady(true);
     await applyFilters({ resetIndex: true });
+    // Enlace compartido: restaurar lo que pida la URL
+    if (location.hash.replace(/^#\/?/, "")) applyRoute(location.hash);
   } catch {
     catalogLoading.classList.add("hidden");
     catalogError.classList.remove("hidden");
+    markCatalogReady(false);
   }
 }
 
@@ -241,7 +427,9 @@ function debouncedFilter(reset = true) {
   if (filterTimer) clearTimeout(filterTimer);
   filterTimer = setTimeout(() => applyFilters({ resetIndex: reset }), 220);
 }
+let filterSeq = 0;
 async function applyFilters({ resetIndex = false } = {}) {
+  const seq = ++filterSeq;
   const typeVal   = filterType.value;
   const regionVal = filterRegion.value;
   const sortVal   = filterSort.value;
@@ -250,6 +438,9 @@ async function applyFilters({ resetIndex = false } = {}) {
   const type2Val = $("filterType2") ? $("filterType2").value : "";
   await ensureTypeCache(typeVal);
   await ensureTypeCache(type2Val);
+  // Si mientras se descargaba el tipo el usuario cambió los filtros otra vez,
+  // esta pasada ya está obsoleta: escribirla pisaría la más reciente.
+  if (seq !== filterSeq) return;
   const typeIds  = typeVal  ? state.typeCache[typeVal]  : null;
   const type2Ids = type2Val ? state.typeCache[type2Val] : null;
   const numericSearch = rawName && /^\d+$/.test(rawName) ? parseInt(rawName, 10) : null;
@@ -340,11 +531,11 @@ function createStageItem(p, off) {
       <div class="screen-corner bl"></div>
       <div class="screen-corner br"></div>
       <div class="stage-screen-inner">
-        <img src="${spriteFor(p.id, { shiny: state.shinyMode, animated: state.animatedMode })}"
-             alt="${p.name}" loading="lazy"
-             onerror="this.src='${spriteFor(p.id, { shiny: state.shinyMode })}'"/>
+        <img alt="${p.name}" loading="lazy"/>
       </div>
     </div>`;
+  applySprite(div.querySelector("img"), p.id,
+              { shiny: state.shinyMode, animated: state.animatedMode });
   div.addEventListener("click", () => {
     const o = parseInt(div.dataset.lastOff, 10);
     if (o !== 0) navigate(o);
@@ -364,13 +555,20 @@ function renderStage() {
     if (el.classList.contains("sparkle-layer")) return;
     const id = parseInt(el.dataset.id, 10);
     if (!visibleIds.has(id)) {
+      if (el._exitTimer) return;              // ya está saliendo, no reprogramar
       const lastOff = parseInt(el.dataset.lastOff, 10);
       el.className = `stage-item ${lastOff < 0 ? "pos-out-l" : "pos-out-r"}`;
-      setTimeout(() => el.remove(), 520);
+      el._exitTimer = setTimeout(() => el.remove(), 520);
     }
   });
   visible.forEach(({ off, item }) => {
     let el = stage.querySelector(`.stage-item[data-id="${item.id}"]`);
+    // Si vuelve a entrar antes de que termine la animación de salida, reutilizamos
+    // el nodo — pero hay que cancelar su borrado o desaparecería igualmente.
+    if (el && el._exitTimer) {
+      clearTimeout(el._exitTimer);
+      el._exitTimer = null;
+    }
     if (!el) {
       el = createStageItem(item, off);
       el.className = `stage-item ${off < 0 ? "pos-out-l" : "pos-out-r"}${state.shinyMode ? " shiny" : ""}`;
@@ -386,7 +584,7 @@ function refreshSprites() {
   stage.querySelectorAll(".stage-item").forEach(el => {
     const id = parseInt(el.dataset.id, 10);
     const img = el.querySelector("img");
-    if (img) img.src = spriteFor(id, { shiny: state.shinyMode, animated: state.animatedMode });
+    if (img) applySprite(img, id, { shiny: state.shinyMode, animated: state.animatedMode });
     el.classList.toggle("shiny", state.shinyMode);
   });
   const cur = state.filtered[state.current];
@@ -438,18 +636,33 @@ function navigateRandom() {
 // Jump to a Pokémon by its species id (used by evolution chain clicks)
 function jumpToId(id) {
   const idx = state.filtered.findIndex(p => p.id === id);
-  if (idx >= 0) {
-    navigateTo(idx);
-  } else {
-    // Not in current filter — clear name filter and try again from full list
-    filterName.value = "";
-    filterType.value = "";
-    filterRegion.value = "";
-    applyFilters({ resetIndex: true }).then(() => {
-      const i2 = state.filtered.findIndex(p => p.id === id);
-      if (i2 >= 0) navigateTo(i2);
-    });
+  if (idx >= 0) { navigateTo(idx); return; }
+
+  // No está en la vista actual. Hay que relajar TODOS los filtros que puedan
+  // estarlo ocultando —antes solo se limpiaban tres y el salto fallaba en
+  // silencio con "★ Favoritos", "◉ Capturados", 2.º tipo o el filtro de stats.
+  filterName.value   = "";
+  filterType.value   = "";
+  filterRegion.value = "";
+  const type2 = $("filterType2");
+  if (type2) type2.value = "";
+
+  pdexUI.favOnly = false;
+  pdexUI.caughtOnly = false;
+  $("chipFav")?.classList.remove("on");
+  $("chipCaught")?.classList.remove("on");
+
+  const statPanel = $("statFilterPanel");
+  if (statPanel && !statPanel.classList.contains("hidden")) {
+    statPanel.classList.add("hidden");
+    $("chipStats")?.classList.remove("on");
   }
+  pdexSyncGenTabs();
+
+  applyFilters({ resetIndex: true }).then(() => {
+    const i2 = state.filtered.findIndex(p => p.id === id);
+    if (i2 >= 0) navigateTo(i2);
+  });
 }
 
 navPrev.addEventListener("click",  () => navigate(-1));
@@ -540,9 +753,20 @@ document.addEventListener("keydown", e => {
     if (e.key === "Escape" || e.key === "?") pdexToggleHelp();
     return;
   }
+  const dataEl = document.getElementById("dataOverlay");
+  if (dataEl && !dataEl.classList.contains("hidden")) {
+    if (e.key === "Escape") dataEl.classList.add("hidden");
+    return;
+  }
   const recentEl = document.getElementById("recentPanel");
   if (recentEl && recentEl.classList.contains("open")) {
     if (e.key === "Escape") pdexCloseRecent();
+    return;
+  }
+  // Estos atajos manejan el carrusel: fuera del modo Pokédex estarían pilotando
+  // una vista oculta (pulsar R en el quiz movía la Pokédex y lanzaba fetches).
+  if (state.mode !== "pokedex") {
+    if (e.key === "?") { e.preventDefault(); pdexToggleHelp(); }
     return;
   }
   switch (e.key) {
@@ -577,8 +801,8 @@ function scheduleDetailLoad() {
   if (!cur) return;
   stageNum.textContent  = `#${padId(cur.id)}`;
   stageName.textContent = cur.name.toUpperCase();
-  animBtn.classList.toggle("disabled", cur.id > 649);
   pdexUpdateForCurrent(cur);
+  syncHash();
 
   const newRegion = regionForId(cur.id);
   if (newRegion !== state.currentRegion) {
@@ -591,10 +815,18 @@ function scheduleDetailLoad() {
 async function fetchPokemonByName(nameOrId) {
   const key = String(nameOrId);
   if (state.detailCache[key]) return state.detailCache[key];
-  const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${nameOrId}`);
-  const data = await res.json();
+  const data = await apiFetch(`https://pokeapi.co/api/v2/pokemon/${nameOrId}`);
   state.detailCache[key]    = data;
   state.detailCache[data.id] = data;
+  return data;
+}
+
+// Un solo punto de entrada para /move (lo pedían por separado el modal y el
+// selector de movimientos del duelo, con el mismo fetch duplicado).
+async function fetchMove(name) {
+  if (state.moveCache[name]) return state.moveCache[name];
+  const data = await apiFetch(`https://pokeapi.co/api/v2/move/${name}`);
+  state.moveCache[name] = data;
   return data;
 }
 
@@ -613,8 +845,7 @@ async function loadCenterDetail() {
     // 2. Species endpoint (cached) — for genus, flavor text, varieties, evolution
     let species = state.speciesCache[cur.id];
     if (!species) {
-      const sr = await fetch(data.species.url);
-      const sd = await sr.json();
+      const sd = await apiFetch(data.species.url);
       const g  = sd.genera.find(x => x.language.name === "es")
               || sd.genera.find(x => x.language.name === "en");
       let entries = sd.flavor_text_entries.filter(e => e.language.name === "es");
@@ -628,6 +859,17 @@ async function loadCenterDetail() {
         flavors: Object.entries(byVer).map(([v, t]) => ({ version: v, text: t })),
         varieties: sd.varieties || [],
         evolutionUrl: sd.evolution_chain?.url || null,
+        // Campos que ya venían en esta misma respuesta y se descartaban
+        captureRate:   sd.capture_rate,
+        genderRate:    sd.gender_rate,
+        eggGroups:     (sd.egg_groups || []).map(e => e.name),
+        hatchCounter:  sd.hatch_counter,
+        growthRate:    sd.growth_rate?.name || null,
+        baseHappiness: sd.base_happiness,
+        habitat:       sd.habitat?.name || null,
+        isLegendary:   sd.is_legendary,
+        isMythical:    sd.is_mythical,
+        isBaby:        sd.is_baby,
       };
       state.speciesCache[cur.id] = species;
     }
@@ -641,13 +883,13 @@ async function loadCenterDetail() {
 
     // 4. Lazy load evolution chain
     if (species.evolutionUrl) {
-      loadEvolutionChain(species.evolutionUrl, data.id);
+      loadEvolutionChain(species.evolutionUrl, data.id, seq);
     } else {
       evoChainEl.innerHTML = '<span class="evo-empty">Sin evolución</span>';
     }
 
     // 5. Lazy load locations (for the BASE species id)
-    loadLocations(cur.id);
+    loadLocations(cur.id, seq);
 
   } catch {
     /* network error */
@@ -663,13 +905,16 @@ async function loadCenterDetail() {
 //  RENDER  Detail card
 // ════════════════════════════════════════════════════════
 function renderAll(data, species) {
-  const primaryType = data.types[0].type.name;
+  // En modo generación el Pokémon puede tener otro tipado (Clefairy era Normal
+  // hasta gen V, Magnemite no era Acero en gen I…).
+  const types = typesForGeneration(data, state.gen);
+  const primaryType = types[0].type.name;
   setAccent(primaryType);
 
   stageNum.textContent   = `#${padId(data.id)}`;
   stageName.textContent  = data.name.toUpperCase();
   stageGenus.textContent = species.genus || "Pokémon";
-  renderStageTypes(data.types);
+  renderStageTypes(types);
 
   $("pokeNumber").textContent = `#${padId(data.id)}`;
   $("pokeName").textContent   = data.name.toUpperCase();
@@ -683,13 +928,93 @@ function renderAll(data, species) {
   $("pokeWeight").textContent = `${(data.weight / 10).toFixed(1)} kg`;
   $("pokeExp").textContent    = data.base_experience ?? "—";
 
-  renderTypes(data.types);
+  renderTypes(types);
+  renderGenNote(data, types);
   renderDescription(species.flavors || []);
   renderAbilities(data.abilities);
   renderStats(data.stats);
-  renderMoves(data.moves);
-  renderWeaknesses(data.types);
+  renderBreeding(species);
+  renderMoves(data);
+  renderWeaknesses(types);
   renderVarieties(species.varieties || [], data.name);
+}
+
+// Aviso cuando la ficha se está mostrando con reglas de otra época
+function renderGenNote(data, types) {
+  const note = $("genNote");
+  if (!note) return;
+  if (state.gen >= CURRENT_GEN) { note.classList.add("hidden"); return; }
+  const ahora = typeNamesOf(data).map(t => TYPE_LABELS_ES[t] || t.toUpperCase());
+  const antes = types.map(t => TYPE_LABELS_ES[t.type.name] || t.type.name.toUpperCase());
+  const cambio = ahora.join("/") !== antes.join("/")
+    ? ` · Tipo actual: <b>${ahora.join(" / ")}</b>`
+    : "";
+  note.innerHTML = `⏳ Viendo con reglas de <b>${GEN_LABELS[state.gen]}</b>${cambio}`;
+  note.classList.remove("hidden");
+}
+
+// ── Crianza y captura ──────────────────────────────────
+const EGG_GROUP_LABELS = {
+  monster:"Monstruo", water1:"Agua 1", water2:"Agua 2", water3:"Agua 3",
+  bug:"Bicho", flying:"Volador", ground:"Campo", fairy:"Hada", plant:"Planta",
+  humanshape:"Humanoide", mineral:"Mineral", indeterminate:"Amorfo",
+  ditto:"Ditto", dragon:"Dragón", "no-eggs":"Sin huevos",
+};
+const GROWTH_LABELS = {
+  slow:"Lento", medium:"Medio", fast:"Rápido", "medium-slow":"Medio-lento",
+  "slow-then-very-fast":"Errático", "fast-then-very-slow":"Fluctuante",
+};
+
+// Probabilidad de captura por lanzamiento (gen V+), a PS máximo, sin estado
+// alterado y con Poké Ball normal:  a = ratio/3  →  P = (a/255)^(3/4)
+function captureChance(rate) {
+  const a = rate / 3;
+  return Math.min(100, Math.pow(a / 255, 0.75) * 100);
+}
+
+function renderBreeding(species) {
+  const grid = $("breedGrid");
+  if (!grid) return;
+  const cells = [];
+  const cell = (label, value, hint) => cells.push(
+    `<div class="breed-cell">
+       <span class="breed-label">${label}</span>
+       <span class="breed-val">${value}</span>
+       ${hint ? `<span class="breed-hint">${hint}</span>` : ""}
+     </div>`);
+
+  if (species.captureRate != null) {
+    cell("Ratio de captura", species.captureRate,
+         `≈ ${captureChance(species.captureRate).toFixed(1)}% por Poké Ball a PS máx.`);
+  }
+  const gr = species.genderRate;
+  if (gr === -1) {
+    cell("Género", "Sin género");
+  } else if (gr != null) {
+    const f = gr / 8 * 100;
+    cell("Género", `♂ ${(100 - f).toFixed(1)}% · ♀ ${f.toFixed(1)}%`);
+  }
+  if (species.eggGroups?.length) {
+    cell("Grupos huevo",
+         species.eggGroups.map(g => EGG_GROUP_LABELS[g] || prettyName(g)).join(" · "));
+  }
+  if (species.hatchCounter != null) {
+    cell("Incubación", `${(species.hatchCounter + 1) * 255} pasos`,
+         `${species.hatchCounter + 1} ciclos de huevo`);
+  }
+  if (species.growthRate) {
+    cell("Curva de EXP", GROWTH_LABELS[species.growthRate] || prettyName(species.growthRate));
+  }
+  if (species.baseHappiness != null) cell("Felicidad base", species.baseHappiness);
+  if (species.habitat) cell("Hábitat", prettyName(species.habitat));
+
+  const tags = [];
+  if (species.isLegendary) tags.push('<span class="breed-tag legendary">★ LEGENDARIO</span>');
+  if (species.isMythical)  tags.push('<span class="breed-tag mythical">✦ SINGULAR</span>');
+  if (species.isBaby)      tags.push('<span class="breed-tag baby">◗ BEBÉ</span>');
+
+  grid.innerHTML = (tags.length ? `<div class="breed-tags">${tags.join("")}</div>` : "")
+                 + (cells.length ? cells.join("") : '<span class="moves-empty">Sin datos.</span>');
 }
 
 function renderStageTypes(types) {
@@ -746,17 +1071,160 @@ function renderStats(stats) {
     });
   });
 }
-function renderMoves(moves) {
-  const list = $("pokeMoves");
-  list.innerHTML = "";
-  moves.slice(0, 16).forEach(m => {
+// ── Movimientos por juego y método de aprendizaje ───────
+// Esta información ya venía dentro de cada /pokemon (version_group_details) y
+// se estaba tirando: antes se mostraban los 16 primeros por orden alfabético.
+const VERSION_GROUP_ORDER = [
+  "red-green-japan","blue-japan","red-blue","yellow",
+  "gold-silver","crystal",
+  "ruby-sapphire","emerald","firered-leafgreen","colosseum","xd",
+  "diamond-pearl","platinum","heartgold-soulsilver",
+  "black-white","black-2-white-2",
+  "x-y","omega-ruby-alpha-sapphire",
+  "sun-moon","ultra-sun-ultra-moon","lets-go-pikachu-lets-go-eevee",
+  "sword-shield","the-isle-of-armor","the-crown-tundra",
+  "brilliant-diamond-shining-pearl","legends-arceus",
+  "scarlet-violet","the-teal-mask","the-indigo-disk",
+  "legends-za","mega-dimension","champions",
+];
+const VERSION_GROUP_LABELS = {
+  "red-green-japan":"Rojo/Verde (JP)", "blue-japan":"Azul (JP)",
+  "red-blue":"Rojo/Azul", "yellow":"Amarillo",
+  "gold-silver":"Oro/Plata", "crystal":"Cristal",
+  "ruby-sapphire":"Rubí/Zafiro", "emerald":"Esmeralda",
+  "firered-leafgreen":"Rojo Fuego/Verde Hoja",
+  "colosseum":"Colosseum", "xd":"XD",
+  "diamond-pearl":"Diamante/Perla", "platinum":"Platino",
+  "heartgold-soulsilver":"HeartGold/SoulSilver",
+  "black-white":"Negro/Blanco", "black-2-white-2":"Negro 2/Blanco 2",
+  "x-y":"X/Y", "omega-ruby-alpha-sapphire":"Rubí Omega/Zafiro Alfa",
+  "sun-moon":"Sol/Luna", "ultra-sun-ultra-moon":"Ultrasol/Ultraluna",
+  "lets-go-pikachu-lets-go-eevee":"Let's Go",
+  "sword-shield":"Espada/Escudo",
+  "the-isle-of-armor":"Isla de la Armadura", "the-crown-tundra":"Tundra Corona",
+  "brilliant-diamond-shining-pearl":"Diamante Bri./Perla Rel.",
+  "legends-arceus":"Leyendas Arceus",
+  "scarlet-violet":"Escarlata/Púrpura",
+  "the-teal-mask":"Máscara Turquesa", "the-indigo-disk":"Disco Índigo",
+  "legends-za":"Leyendas Z-A", "mega-dimension":"Mega Dimensión",
+  "champions":"Champions",
+};
+// La API tiene más métodos de aprendizaje que los cuatro clásicos (p. ej.
+// "train" en Champions o "stadium-surfing-pikachu"), y va añadiendo más con
+// cada juego. En vez de una lista fija, mostramos los que realmente aparecen
+// y traducimos los que conocemos.
+const MOVE_METHOD_LABELS = {
+  "level-up":"NIVEL", "machine":"MT/MO", "egg":"HUEVO", "tutor":"TUTOR",
+  "train":"ENTRENO", "form-change":"CAMBIO DE FORMA",
+  "light-ball-egg":"HUEVO (BOLA LUZ)", "stadium-surfing-pikachu":"STADIUM: SURF",
+  "colosseum-purification":"PURIFICACIÓN", "xd-shadow":"OSCURO (XD)",
+  "xd-purification":"PURIFICACIÓN (XD)", "zygarde-cube":"CUBO ZYGARDE",
+};
+const MOVE_METHOD_ORDER = ["level-up", "machine", "egg", "tutor", "train"];
+const methodLabel = k => MOVE_METHOD_LABELS[k] || prettyName(k).toUpperCase();
+
+function methodsPresent(methods) {
+  return Object.keys(methods)
+    .filter(k => methods[k].length > 0)
+    .sort((a, b) => {
+      const ia = MOVE_METHOD_ORDER.indexOf(a), ib = MOVE_METHOD_ORDER.indexOf(b);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a.localeCompare(b);
+    });
+}
+
+const moveset = { byVg: {}, vg: null, method: "level-up" };
+
+function groupMovesByVersion(data) {
+  const byVg = {};
+  data.moves.forEach(m => {
+    m.version_group_details.forEach(d => {
+      const vg     = d.version_group.name;
+      const method = d.move_learn_method.name;
+      if (!byVg[vg])         byVg[vg] = {};
+      if (!byVg[vg][method]) byVg[vg][method] = new Map();
+      const prev = byVg[vg][method].get(m.move.name);
+      // Un mismo movimiento puede aparecer repetido: nos quedamos con el nivel más bajo
+      if (!prev || d.level_learned_at < prev.level) {
+        byVg[vg][method].set(m.move.name, { name: m.move.name, level: d.level_learned_at });
+      }
+    });
+  });
+  Object.values(byVg).forEach(methods => {
+    Object.keys(methods).forEach(k => {
+      methods[k] = [...methods[k].values()].sort((a, b) => k === "level-up"
+        ? (a.level - b.level || a.name.localeCompare(b.name))
+        : a.name.localeCompare(b.name));
+    });
+  });
+  return byVg;
+}
+
+function renderMoves(data) {
+  moveset.byVg = groupMovesByVersion(data);
+  // Solo juegos con algún movimiento: si no, el desplegable tendría opciones
+  // que al elegirlas no muestran nada.
+  const hasMoves = vg => methodsPresent(moveset.byVg[vg] || {}).length > 0;
+  const available = VERSION_GROUP_ORDER.filter(vg => moveset.byVg[vg] && hasMoves(vg));
+  // Cualquier juego que no esté en nuestra lista (la API añade nuevos), al final
+  Object.keys(moveset.byVg).forEach(vg => {
+    if (!available.includes(vg) && hasMoves(vg)) available.push(vg);
+  });
+
+  const sel  = $("moveVersionSel");
+  const tabs = $("moveMethodTabs");
+  if (available.length === 0) {
+    if (sel)  sel.innerHTML = "<option>—</option>";
+    if (tabs) tabs.innerHTML = "";
+    $("pokeMoves").innerHTML = '<span class="moves-empty">Sin datos de movimientos.</span>';
+    return;
+  }
+  moveset.vg = available[available.length - 1];   // por defecto, el juego más reciente
+  if (sel) {
+    sel.innerHTML = available.map(vg =>
+      `<option value="${vg}">${VERSION_GROUP_LABELS[vg] || prettyName(vg)}</option>`).join("");
+    sel.value = moveset.vg;
+    sel.onchange = () => { moveset.vg = sel.value; renderMovesetTabs(); };
+  }
+  renderMovesetTabs();
+}
+
+function renderMovesetTabs() {
+  const methods = moveset.byVg[moveset.vg] || {};
+  const tabs    = $("moveMethodTabs");
+  const present = methodsPresent(methods);
+  // Al cambiar de juego el método activo puede no existir allí
+  if (!present.includes(moveset.method)) moveset.method = present[0] || "level-up";
+  if (tabs) {
+    tabs.innerHTML = present.map(k => `
+      <button class="mm-tab${k === moveset.method ? " active" : ""}" data-method="${k}">
+        ${methodLabel(k)}<span class="mm-count">${methods[k].length}</span>
+      </button>`).join("");
+    tabs.querySelectorAll(".mm-tab").forEach(b => {
+      b.addEventListener("click", () => { moveset.method = b.dataset.method; renderMovesetTabs(); });
+    });
+  }
+  renderMovesetList(methods[moveset.method] || []);
+}
+
+function renderMovesetList(list) {
+  const el = $("pokeMoves");
+  el.innerHTML = "";
+  if (list.length === 0) {
+    el.innerHTML = '<span class="moves-empty">Sin movimientos en esta categoría.</span>';
+    return;
+  }
+  const frag = document.createDocumentFragment();
+  list.forEach(mv => {
     const s = document.createElement("span");
     s.className = "move-tag";
-    s.textContent = cap(m.move.name.replace(/-/g, " "));
-    s.dataset.name = m.move.name;
-    s.addEventListener("click", () => openMoveModal(m.move.name));
-    list.appendChild(s);
+    s.dataset.name = mv.name;
+    s.innerHTML = (moveset.method === "level-up" && mv.level > 0)
+      ? `<span class="move-lv">Nv.${mv.level}</span>${cap(mv.name.replace(/-/g, " "))}`
+      : cap(mv.name.replace(/-/g, " "));
+    s.addEventListener("click", () => openMoveModal(mv.name));
+    frag.appendChild(s);
   });
+  el.appendChild(frag);
 }
 
 // ── Description ────────────────────────────────────────
@@ -782,13 +1250,8 @@ function renderDescription(flavors) {
 // ════════════════════════════════════════════════════════
 function calcWeaknesses(defenderTypes) {
   const result = {};
-  Object.keys(TYPE_CHART).forEach(attacker => {
-    let mult = 1;
-    defenderTypes.forEach(d => {
-      const m = TYPE_CHART[attacker][d];
-      if (m !== undefined) mult *= m;
-    });
-    result[attacker] = mult;
+  activeTypes().forEach(attacker => {
+    result[attacker] = effectiveness(attacker, defenderTypes);
   });
   return result;
 }
@@ -831,19 +1294,22 @@ function formatMult(key) {
 // ════════════════════════════════════════════════════════
 //  EVOLUTION CHAIN
 // ════════════════════════════════════════════════════════
-async function loadEvolutionChain(url, currentId) {
+async function loadEvolutionChain(url, currentId, seq) {
   const cacheKey = url;
   let chain = state.evoCache[cacheKey];
   if (!chain) {
     try {
-      const r = await fetch(url);
-      chain = await r.json();
+      chain = await apiFetch(url);
       state.evoCache[cacheKey] = chain;
     } catch {
-      evoChainEl.innerHTML = '<span class="evo-empty">No se pudo cargar la evolución.</span>';
+      if (seq === detailRequestSeq) {
+        evoChainEl.innerHTML = '<span class="evo-empty">No se pudo cargar la evolución.</span>';
+      }
       return;
     }
   }
+  // Puede haber llegado tarde: si ya estamos en otro Pokémon, no pintar.
+  if (seq !== undefined && seq !== detailRequestSeq) return;
   evoChainEl.innerHTML = "";
   evoChainEl.appendChild(buildEvolutionTree(chain.chain, currentId));
 }
@@ -913,7 +1379,8 @@ function prettyName(s) {
 // ════════════════════════════════════════════════════════
 //  LOCATIONS (where to find it)
 // ════════════════════════════════════════════════════════
-async function loadLocations(id) {
+async function loadLocations(id, seq) {
+  const stale = () => seq !== undefined && seq !== detailRequestSeq;
   if (state.locationCache[id]) {
     renderLocations(state.locationCache[id]);
     return;
@@ -921,12 +1388,12 @@ async function loadLocations(id) {
   locationsList.innerHTML = '<span class="loc-empty">Buscando ubicaciones…</span>';
   try {
     const data = state.detailCache[id] || await fetchPokemonByName(id);
-    const url  = data.location_area_encounters;
-    const r    = await fetch(url);
-    const arr  = await r.json();
+    const arr  = await apiFetch(data.location_area_encounters);
     state.locationCache[id] = arr;
+    if (stale()) return;          // ya navegamos a otro Pokémon
     renderLocations(arr);
   } catch {
+    if (stale()) return;
     locationsList.innerHTML = '<span class="loc-empty">No se pudieron cargar las ubicaciones.</span>';
   }
 }
@@ -988,7 +1455,10 @@ async function loadVariety(name) {
   try {
     const data = await fetchPokemonByName(name);
     const cur  = state.filtered[state.current];
-    const species = state.speciesCache[cur.id];   // reuse species (varieties share it)
+    // Las formas comparten especie; si por lo que sea no está cacheada,
+    // renderAll reventaría al leer species.genus.
+    const species = (cur && state.speciesCache[cur.id])
+                 || { genus: "Pokémon", flavors: [], varieties: [] };
     renderAll(data, species);
   } catch {} finally {
     cardLoading.classList.add("hidden");
@@ -1017,8 +1487,7 @@ async function openAbilityModal(abilityName) {
   let data = state.abilityCache[abilityName];
   if (!data) {
     try {
-      const r = await fetch(`https://pokeapi.co/api/v2/ability/${abilityName}`);
-      data = await r.json();
+      data = await apiFetch(`https://pokeapi.co/api/v2/ability/${abilityName}`);
       state.abilityCache[abilityName] = data;
     } catch {
       modalContent.innerHTML = `<p style="padding:20px;color:#ff8888">Error al cargar la habilidad.</p>`;
@@ -1052,18 +1521,14 @@ async function openAbilityModal(abilityName) {
 
 async function openMoveModal(moveName) {
   openModal();
-  let data = state.moveCache[moveName];
-  if (!data) {
-    try {
-      const r = await fetch(`https://pokeapi.co/api/v2/move/${moveName}`);
-      data = await r.json();
-      state.moveCache[moveName] = data;
-    } catch {
-      modalContent.innerHTML = `<p style="padding:20px;color:#ff8888">Error al cargar el movimiento.</p>`;
-      modalLoading.classList.add("hidden");
-      modalContent.classList.remove("hidden");
-      return;
-    }
+  let data;
+  try {
+    data = await fetchMove(moveName);
+  } catch {
+    modalContent.innerHTML = `<p style="padding:20px;color:#ff8888">Error al cargar el movimiento.</p>`;
+    modalLoading.classList.add("hidden");
+    modalContent.classList.remove("hidden");
+    return;
   }
   const nameEntry = data.names.find(n => n.language.name === "es") || data.names.find(n => n.language.name === "en");
   const displayName = nameEntry ? nameEntry.name : prettyName(data.name);
@@ -1304,8 +1769,7 @@ async function ensureTypeCache(tv) {
   if (!tv || state.typeCache[tv]) return;
   typeLoading.classList.remove("hidden");
   try {
-    const r = await fetch(`https://pokeapi.co/api/v2/type/${tv}`);
-    const d = await r.json();
+    const d = await apiFetch(`https://pokeapi.co/api/v2/type/${tv}`);
     state.typeCache[tv] = new Set(
       d.pokemon.map(p => getId(p.pokemon.url)).filter(id => id >= 1 && id <= 1025)
     );
@@ -1321,36 +1785,101 @@ function pdexIndexStats(data) {
   rec.bst = STAT_ORDER.reduce((t, k) => t + (rec[k] || 0), 0);
   state.statIndex[data.id] = rec;
 }
+// Los stats de los 1025 en UNA sola petición vía GraphQL.
+// Antes eran 1025 peticiones REST con 24 workers en paralelo y sin reintentos:
+// cualquier fallo dejaba huecos en statIndex que el filtro descartaba en
+// silencio, y esa ráfaga contradice la fair-use policy de PokéAPI.
+const GRAPHQL_URL     = "https://beta.pokeapi.co/graphql/v1beta";
+const STATS_CACHE_KEY = "stats:all:v1";
+
+async function fetchAllStatsGraphQL() {
+  const query = `query AllStats {
+    pokemon_v2_pokemon(where: {id: {_lte: 1025}}, order_by: {id: asc}, limit: 2000) {
+      id
+      pokemon_v2_pokemonstats { base_stat pokemon_v2_stat { name } }
+    }
+  }`;
+  const res = await fetch(GRAPHQL_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query }),
+  });
+  if (!res.ok) throw new Error(`GraphQL HTTP ${res.status}`);
+  const json = await res.json();
+  if (json.errors) throw new Error("GraphQL: " + (json.errors[0]?.message || "error"));
+  const rows = json.data?.pokemon_v2_pokemon || [];
+  if (rows.length === 0) throw new Error("GraphQL devolvió 0 filas");
+  return rows;
+}
+
+// Plan B si GraphQL no está disponible (es un endpoint beta): REST, pero con
+// muchos menos workers y devolviendo si se completó de verdad o no.
+async function pdexLoadAllStatsREST(setBar) {
+  const ids   = state.allPokemon.map(p => p.id).filter(id => !state.statIndex[id]);
+  const total = state.allPokemon.length;
+  let done = total - ids.length, failed = 0;
+  const queue = ids.slice();
+  const worker = async () => {
+    while (queue.length) {
+      const id = queue.shift();
+      try { pdexIndexStats(await fetchPokemonByName(id)); }
+      catch { failed++; }
+      done++;
+      if (done % 25 === 0) setBar(Math.round(done / total * 100));
+    }
+  };
+  await Promise.all(Array.from({ length: 8 }, worker));
+  return failed === 0;
+}
+
 async function pdexLoadAllStats() {
   if (state.statAllLoaded || state._statLoading) return;
   state._statLoading = true;
-  const ids = state.allPokemon.map(p => p.id).filter(id => !state.statIndex[id]);
-  const bar = $("statLoadBar");
-  let done = state.allPokemon.length - ids.length;
-  const total = state.allPokemon.length;
-  const setBar = () => { if (bar) bar.style.width = Math.round(done / total * 100) + "%"; };
-  setBar();
-  const queue = ids.slice();
-  async function worker() {
-    while (queue.length) {
-      const id = queue.shift();
-      try {
-        const d = await fetchPokemonByName(id);
-        pdexIndexStats(d);
-      } catch {}
-      done++;
-      if (done % 12 === 0) setBar();
+  const bar    = $("statLoadBar");
+  const status = $("statLoadStatus");
+  const setBar = pct => { if (bar) bar.style.width = pct + "%"; };
+  setBar(5);
+
+  let ok = false;
+  try {
+    const entry = await idbGet(STATS_CACHE_KEY);
+    let rows;
+    if (entry && Date.now() - entry.ts < CACHE_TTL) {
+      rows = entry.data;                       // segunda visita: sin red
+    } else {
+      rows = await fetchAllStatsGraphQL();
+      idbSet(STATS_CACHE_KEY, { ts: Date.now(), data: rows });
     }
+    setBar(70);
+    rows.forEach(row => {
+      const rec = {};
+      row.pokemon_v2_pokemonstats.forEach(s => { rec[s.pokemon_v2_stat.name] = s.base_stat; });
+      rec.bst = STAT_ORDER.reduce((t, k) => t + (rec[k] || 0), 0);
+      state.statIndex[row.id] = rec;
+    });
+    ok = true;
+  } catch {
+    if (status) status.textContent = "GraphQL no disponible, cargando por REST…";
+    ok = await pdexLoadAllStatsREST(setBar);
   }
-  await Promise.all(Array.from({ length: 24 }, worker));
-  setBar();
-  state.statAllLoaded = true;
-  state._statLoading = false;
+  setBar(100);
+
+  // Solo damos por buenos los datos si están COMPLETOS: con huecos, el filtro
+  // haría desaparecer Pokémon sin explicar por qué.
+  state.statAllLoaded = ok;
+  state._statLoading  = false;
+
   const panel = $("statFilterPanel");
-  if (panel) panel.classList.remove("stats-locked");
-  const st = $("statLoadStatus");
-  if (st) st.textContent = "✓ Datos de stats listos";
-  applyFilters({ resetIndex: true });
+  if (ok) {
+    if (panel)  panel.classList.remove("stats-locked");
+    if (status) status.textContent = "✓ Datos de stats listos";
+    // resetIndex:false — cargar datos no debe echarte del Pokémon que estabas viendo
+    applyFilters({ resetIndex: false });
+  } else {
+    if (status) status.textContent = "⚠ No se pudieron cargar todos los stats. Inténtalo de nuevo.";
+    const btn = $("statLoadBtn");
+    if (btn) btn.disabled = false;
+  }
 }
 function pdexStatFilter() {
   const panel = $("statFilterPanel");
@@ -1526,11 +2055,19 @@ function pdexBuildControls() {
         <span class="filter-label">▸ 2.º TIPO</span>
         <select class="filter-sel" id="filterType2">${typeOpts}</select>
       </div>
+      <div class="filter-group">
+        <span class="filter-label">▸ ÉPOCA</span>
+        <select class="filter-sel" id="filterGen" title="Reglas de qué generación aplicar">
+          ${[9,8,7,6,5,4,3,2,1].map(g =>
+            `<option value="${g}">${GEN_LABELS[g]}</option>`).join("")}
+        </select>
+      </div>
       <div class="pdex-chips">
         <button class="filter-chip" id="chipFav" title="Ver solo favoritos">★ Favoritos</button>
         <button class="filter-chip" id="chipCaught" title="Ver solo capturados">◉ Capturados</button>
         <button class="filter-chip" id="chipStats" title="Filtro por estadísticas">📊 Stats</button>
         <button class="filter-chip" id="chipView" title="Vista de lista compacta (L)">☰ Lista</button>
+        <button class="filter-chip" id="chipData" title="Exportar / importar tu Pokédex">⇄ Datos</button>
         <button class="filter-chip" id="chipHelp" title="Atajos de teclado (?)">? Ayuda</button>
       </div>
     </div>
@@ -1607,6 +2144,27 @@ function pdexBuildControls() {
   document.querySelector(".app-root").appendChild(recentBtn);
   document.querySelector(".app-root").appendChild(recentPanel);
 
+  // panel de datos (exportar / importar)
+  const dataOv = document.createElement("div");
+  dataOv.className = "help-overlay hidden";
+  dataOv.id = "dataOverlay";
+  dataOv.innerHTML = `
+    <div class="help-card">
+      <button class="help-close" id="dataClose">✕</button>
+      <h3 class="help-title">⇄ TUS DATOS</h3>
+      <p class="data-desc">
+        Todo lo tuyo (favoritos, capturados, notas, equipo, récord del quiz) vive
+        solo en este navegador. Expórtalo para no perderlo o llevarlo a otro sitio.
+      </p>
+      <div class="data-actions">
+        <button class="data-btn" id="dataExport">⬇ Exportar a archivo</button>
+        <button class="data-btn" id="dataImportBtn">⬆ Importar archivo</button>
+        <input type="file" id="dataImportFile" accept="application/json,.json" hidden />
+      </div>
+      <div class="data-status" id="dataStatus"></div>
+    </div>`;
+  document.body.appendChild(dataOv);
+
   // help overlay
   const help = document.createElement("div");
   help.className = "help-overlay hidden";
@@ -1641,6 +2199,12 @@ function pdexBuildControls() {
     favBtn.title = "Favorito (F)";
     favBtn.innerHTML = `<span class="st-icon">★</span><span class="st-label">FAV</span>`;
     favBtn.addEventListener("click", pdexToggleFav);
+    const linkBtn = document.createElement("button");
+    linkBtn.className = "stage-tool"; linkBtn.id = "linkBtn";
+    linkBtn.title = "Copiar enlace a este Pokémon";
+    linkBtn.innerHTML = `<span class="st-icon">🔗</span><span class="st-label">ENLACE</span>`;
+    linkBtn.addEventListener("click", copyShareLink);
+    tools.appendChild(linkBtn);
     const caughtBtn = document.createElement("button");
     caughtBtn.className = "stage-tool"; caughtBtn.id = "caughtBtn";
     caughtBtn.title = "Capturado (G)";
@@ -1677,6 +2241,40 @@ function pdexBindControls() {
   });
   $("chipView").addEventListener("click", pdexToggleView);
   $("chipHelp").addEventListener("click", pdexToggleHelp);
+  $("chipData").addEventListener("click", () => $("dataOverlay").classList.toggle("hidden"));
+  $("dataClose").addEventListener("click", () => $("dataOverlay").classList.add("hidden"));
+  $("dataOverlay").addEventListener("click", e => {
+    if (e.target === $("dataOverlay")) $("dataOverlay").classList.add("hidden");
+  });
+  $("dataExport").addEventListener("click", exportData);
+  $("dataImportBtn").addEventListener("click", () => $("dataImportFile").click());
+  $("dataImportFile").addEventListener("change", e => {
+    const f = e.target.files?.[0];
+    if (f) importData(f);
+    e.target.value = "";                      // permite reimportar el mismo archivo
+  });
+
+  // Época (modo generación)
+  $("filterGen").addEventListener("change", async e => {
+    const g = parseInt(e.target.value, 10);
+    const sel = e.target;
+    if (g < CURRENT_GEN) {
+      sel.disabled = true;
+      const ok = await ensureTypeInfo();
+      sel.disabled = false;
+      if (!ok) {
+        sel.value = String(state.gen);
+        alert("No se pudo cargar la tabla de tipos histórica. Revisa tu conexión.");
+        return;
+      }
+    }
+    state.gen   = g;
+    activeChart = chartForGeneration(g);
+    document.body.classList.toggle("retro-gen", g < CURRENT_GEN);
+    loadCenterDetail();                       // repinta la ficha con las nuevas reglas
+    if (TOOL_INITED.team && teamState.members.length) renderTeamAnalysis();
+    if (TOOL_INITED.duel && duelState.A && duelState.B) runBattle();
+  });
 
   filterRegion.addEventListener("change", pdexSyncGenTabs);
 
@@ -1756,10 +2354,161 @@ function pdexInit() {
 }
 
 // ════════════════════════════════════════════════════════
+//  ENLACES COMPARTIBLES  +  EXPORTAR / IMPORTAR
+// ════════════════════════════════════════════════════════
+const MODE_ROUTES = { pokedex:"pokedex", quiz:"quiz", duel:"batalla", team:"equipo", roulette:"ruleta" };
+const ROUTE_MODES = Object.fromEntries(Object.entries(MODE_ROUTES).map(([m, r]) => [r, m]));
+
+function currentRoute() {
+  if (state.mode === "pokedex") {
+    const cur = state.filtered[state.current];
+    return cur ? `#/pokemon/${cur.id}` : "#/pokedex";
+  }
+  if (state.mode === "team" && teamState.members.length) {
+    return `#/equipo/${teamState.members.map(m => m.id).join(",")}`;
+  }
+  return `#/${MODE_ROUTES[state.mode] || "pokedex"}`;
+}
+// replaceState y no push: navegar por el carrusel no debe llenar el historial
+function syncHash() {
+  const route = currentRoute();
+  if (location.hash !== route) history.replaceState(null, "", route);
+}
+
+let applyingRoute = false;
+async function applyRoute(hash) {
+  if (applyingRoute) return;
+  applyingRoute = true;
+  try {
+    const parts = String(hash || "").replace(/^#\/?/, "").split("/");
+    const head  = parts[0] || "";
+    if (head === "pokemon" && parts[1]) {
+      if (state.mode !== "pokedex") await switchMode("pokedex");
+      const id = parseInt(parts[1], 10);
+      if (Number.isFinite(id)) jumpToId(id);
+      return;
+    }
+    if (head === "equipo") {
+      if (parts[1]) {
+        const ids = parts[1].split(",").map(n => parseInt(n, 10))
+                      .filter(Number.isFinite).slice(0, 6);
+        const arr = (await Promise.all(ids.map(id => fetchPokemonByName(id).catch(() => null))))
+                      .filter(Boolean);
+        if (arr.length) { teamState.members = arr; saveTeam(); }
+      }
+      await switchMode("team");
+      renderTeamSlots(); renderTeamAnalysis();
+      return;
+    }
+    if (ROUTE_MODES[head]) await switchMode(ROUTE_MODES[head]);
+  } finally { applyingRoute = false; }
+}
+window.addEventListener("hashchange", () => applyRoute(location.hash));
+
+function toast(msg) {
+  let el = $("toast");
+  if (!el) {
+    el = document.createElement("div");
+    el.className = "toast"; el.id = "toast";
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.classList.add("show");
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove("show"), 2200);
+}
+
+async function copyShareLink() {
+  syncHash();
+  const url = location.href;
+  try {
+    await navigator.clipboard.writeText(url);
+    toast("Enlace copiado ✓");
+  } catch {
+    window.prompt("Copia el enlace:", url);   // sin permiso de portapapeles
+  }
+}
+
+// ── Exportar / importar el Pokédex personal ──────────────
+const DATA_VERSION = 1;
+function buildExport() {
+  let quizBest = 0;
+  try { quizBest = parseInt(localStorage.getItem("pokequiz_best") || "0", 10) || 0; } catch {}
+  return {
+    app: "pokedex", version: DATA_VERSION, exportedAt: new Date().toISOString(),
+    favs:   [...PDEX.favs],
+    caught: [...PDEX.caught],
+    notes:  PDEX.notes,
+    recent: PDEX.recent,
+    team:   teamState.members.map(m => m.id),
+    quizBest,
+  };
+}
+
+function exportData() {
+  const blob = new Blob([JSON.stringify(buildExport(), null, 2)], { type: "application/json" });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href = url;
+  a.download = `pokedex-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  const st = $("dataStatus");
+  if (st) st.textContent = `✓ Exportados ${PDEX.caught.size} capturados y ${PDEX.favs.size} favoritos.`;
+}
+
+async function importData(file) {
+  const st   = $("dataStatus");
+  const fail = msg => { if (st) st.innerHTML = `<span class="data-err">✕ ${msg}</span>`; };
+  let json;
+  try { json = JSON.parse(await file.text()); }
+  catch { return fail("El archivo no es un JSON válido."); }
+  if (!json || json.app !== "pokedex" || !Array.isArray(json.favs) || !Array.isArray(json.caught)) {
+    return fail("No parece un archivo exportado desde esta Pokédex.");
+  }
+  const nums = a => (Array.isArray(a) ? a : []).map(Number).filter(Number.isFinite);
+
+  PDEX.favs   = new Set(nums(json.favs));
+  PDEX.caught = new Set(nums(json.caught));
+  PDEX.notes  = (json.notes && typeof json.notes === "object") ? json.notes : {};
+  PDEX.recent = nums(json.recent).slice(0, 10);
+  ["favs", "caught", "notes", "recent"].forEach(pdexSave);
+
+  if (Number.isFinite(json.quizBest)) {
+    try { localStorage.setItem("pokequiz_best", String(json.quizBest)); } catch {}
+    quizState.score.best = json.quizBest;
+    const qb = $("quizBest"); if (qb) qb.textContent = json.quizBest;
+  }
+  const teamIds = nums(json.team).slice(0, 6);
+  if (teamIds.length) {
+    const arr = (await Promise.all(teamIds.map(id => fetchPokemonByName(id).catch(() => null)))).filter(Boolean);
+    if (arr.length) {
+      teamState.members = arr; saveTeam();
+      if (TOOL_INITED.team) { renderTeamSlots(); renderTeamAnalysis(); }
+    }
+  }
+  pdexRenderProgress();
+  pdexRenderRecent();
+  const cur = state.filtered[state.current];
+  if (cur) pdexUpdateForCurrent(cur);
+  await applyFilters({ resetIndex: false });
+  const nNotas = Object.keys(PDEX.notes).length;
+  if (st) st.textContent = `✓ Importados ${PDEX.caught.size} capturados, `
+        + `${PDEX.favs.size} favoritos y ${nNotas} ${nNotas === 1 ? "nota" : "notas"}.`;
+}
+
+// ════════════════════════════════════════════════════════
 //  INIT
 // ════════════════════════════════════════════════════════
 pdexInit();
 loadCatalog();
+
+// Service worker: caché offline (solo sobre http/https, no en file://)
+if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  });
+}
 
 
 // ════════════════════════════════════════════════════════
@@ -1770,7 +2519,8 @@ loadCatalog();
 
 const TOOL_INITED = {};
 
-function switchMode(mode) {
+async function switchMode(mode) {
+  state.mode = mode;
   document.querySelectorAll(".mode-tab").forEach(t => {
     t.classList.toggle("active", t.dataset.mode === mode);
   });
@@ -1782,12 +2532,19 @@ function switchMode(mode) {
     const el = document.getElementById(id);
     if (el) el.classList.toggle("hidden", m !== mode);
   });
-  // Lazy init
+  window.scrollTo({ top: 0, behavior: "smooth" });
+  syncHash();
+
+  // Lazy init — pero nunca antes de tener el catálogo cargado
+  if (mode !== "pokedex") {
+    const ok = await catalogReady;
+    if (!ok) return;
+    if (state.mode !== mode) return;   // el usuario cambió de modo mientras esperaba
+  }
   if (mode === "quiz"     && !TOOL_INITED.quiz)     initQuiz();
   if (mode === "duel"     && !TOOL_INITED.duel)     initDuel();
   if (mode === "team"     && !TOOL_INITED.team)     initTeam();
   if (mode === "roulette" && !TOOL_INITED.roulette) initRoulette();
-  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 document.querySelectorAll(".mode-tab").forEach(tab => {
   tab.addEventListener("click", () => switchMode(tab.dataset.mode));
@@ -2014,14 +2771,8 @@ async function populateDuelMoves(side, atk) {
 
 async function onMoveSelect(side, moveName) {
   if (!moveName) { duelState["move" + side] = null; runBattle(); return; }
-  let m = state.moveCache[moveName];
-  if (!m) {
-    try {
-      const r = await fetch(`https://pokeapi.co/api/v2/move/${moveName}`);
-      m = await r.json();
-      state.moveCache[moveName] = m;
-    } catch { return; }
-  }
+  let m;
+  try { m = await fetchMove(moveName); } catch { return; }
   duelState["move" + side] = m;
   runBattle();
 }
@@ -2060,15 +2811,9 @@ function calcDamage(atk, def, move, level) {
   const A  = cat === "physical" ? atkStats["attack"]  : atkStats["special-attack"];
   const D  = cat === "physical" ? defStats["defense"] : defStats["special-defense"];
   const HP = defStats["hp"];
-  const atkTypes = atk.types.map(t => t.type.name);
-  const stab = atkTypes.includes(moveType) ? 1.5 : 1;
-  const defTypes = def.types.map(t => t.type.name);
-  let eff = 1;
-  defTypes.forEach(d => {
-    const x = TYPE_CHART[moveType] && TYPE_CHART[moveType][d];
-    if (x !== undefined) eff *= x;
-  });
-  const base = (((2 * level / 5 + 2) * power * A) / Math.max(D, 1)) / 50 + 2;
+  const stab = typeNamesOf(atk).includes(moveType) ? 1.5 : 1;
+  const eff  = effectiveness(moveType, typeNamesOf(def));
+  const base =(((2 * level / 5 + 2) * power * A) / Math.max(D, 1)) / 50 + 2;
   const min  = Math.floor(base * stab * eff * 0.85);
   const max  = Math.floor(base * stab * eff * 1.0);
   return { isStatus: false, moveType, cat, power, stab, eff, A, D, HP, min, max,
@@ -2137,7 +2882,7 @@ function renderBattleStats(A, B) {
         <div class="duel-total-side ${totalA > totalB ? "winner" : ""}">${totalA}</div>
         <div class="duel-total-label">${A.name.toUpperCase()}</div>
       </div>
-      <div class="duel-total-label">TOTAL BASE</div>
+      <div class="duel-total-label">TOTAL AL NV. ${duelState.level}</div>
       <div>
         <div class="duel-total-side ${totalB > totalA ? "winner" : ""}">${totalB}</div>
         <div class="duel-total-label">${B.name.toUpperCase()}</div>
@@ -2151,13 +2896,9 @@ function renderBattleMatchup(A, B) {
   // For each side, calc multipliers from THEIR types AS ATTACKER against opponent's types
   function side(att, defender) {
     const buckets = { x4:[], x2:[], x1:[], x05:[], x025:[], x0:[] };
-    att.types.forEach(t => {
-      const tn = t.type.name;
-      let mult = 1;
-      defender.types.forEach(d => {
-        const x = TYPE_CHART[tn] && TYPE_CHART[tn][d.type.name];
-        if (x !== undefined) mult *= x;
-      });
+    const defTypes = typeNamesOf(defender);
+    typeNamesOf(att).forEach(tn => {
+      const mult = effectiveness(tn, defTypes);
       if (mult === 4) buckets.x4.push(tn);
       else if (mult === 2) buckets.x2.push(tn);
       else if (mult === 1) buckets.x1.push(tn);
@@ -2249,18 +2990,10 @@ function renderBattleVerdict(A, B) {
   const offB = Math.max(sb.attack, sb["special-attack"]);
   const offWinner = offA > offB * 1.1 ? "A" : offB > offA * 1.1 ? "B" : "tie";
   // Type advantage: who has more super-effective options STAB
-  function countSuper(att, def) {
-    let n = 0;
-    att.types.forEach(t => {
-      let m = 1;
-      def.types.forEach(d => {
-        const x = TYPE_CHART[t.type.name] && TYPE_CHART[t.type.name][d.type.name];
-        if (x !== undefined) m *= x;
-      });
-      if (m >= 2) n++;
-    });
-    return n;
-  }
+  const countSuper = (att, def) => {
+    const defTypes = typeNamesOf(def);
+    return typeNamesOf(att).filter(tn => effectiveness(tn, defTypes) >= 2).length;
+  };
   const supA = countSuper(A, B), supB = countSuper(B, A);
   const typeWinner = supA > supB ? "A" : supB > supA ? "B" : "tie";
 
@@ -2313,6 +3046,7 @@ function initTeam() {
     if (saved) {
       const ids = JSON.parse(saved);
       Promise.all(ids.map(id => fetchPokemonByName(id))).then(arr => {
+        if (teamState.members.length) return;   // una URL compartida ya puso equipo
         teamState.members = arr;
         renderTeamSlots();
         renderTeamAnalysis();
@@ -2513,15 +3247,11 @@ function renderTeamAnalysis() {
   // ════ 4) Defensive coverage per member ════
   // For each attacking type, list members with their multiplier
   const defcov = {};
-  Object.keys(TYPE_CHART).forEach(att => defcov[att] = []);
+  activeTypes().forEach(att => defcov[att] = []);
   members.forEach(m => {
-    const ts = m.types.map(t => t.type.name);
-    Object.keys(TYPE_CHART).forEach(att => {
-      let mult = 1;
-      ts.forEach(d => {
-        const x = TYPE_CHART[att][d];
-        if (x !== undefined) mult *= x;
-      });
+    const ts = typeNamesOf(m);
+    activeTypes().forEach(att => {
+      const mult = effectiveness(att, ts);
       if (mult >= 2) defcov[att].push({ member: m, mult });
     });
   });
@@ -2555,21 +3285,16 @@ function renderTeamAnalysis() {
   // ════ 5) Offensive coverage (STAB-based) ════
   // For each defensive type, count how many members have a STAB type that's super-effective vs it
   const offcov = {};
-  Object.keys(TYPE_CHART).forEach(d => offcov[d] = []);
+  activeTypes().forEach(d => offcov[d] = []);
   members.forEach(m => {
-    const stabTypes = m.types.map(t => t.type.name);
-    Object.keys(TYPE_CHART).forEach(defType => {
-      // does any STAB type hit defType for >=2x?
-      let bestMult = 0;
-      stabTypes.forEach(att => {
-        const x = TYPE_CHART[att][defType];
-        const mult = x === undefined ? 1 : x;
-        if (mult > bestMult) bestMult = mult;
-      });
-      if (bestMult >= 2) offcov[defType].push(m);
+    const stabTypes = typeNamesOf(m);
+    activeTypes().forEach(defType => {
+      // ¿algún tipo STAB golpea a defType con ×2 o más?
+      const best = Math.max(...stabTypes.map(att => effectiveness(att, [defType])));
+      if (best >= 2) offcov[defType].push(m);
     });
   });
-  $("teamOffCov").innerHTML = Object.keys(TYPE_CHART).map(t => {
+  $("teamOffCov").innerHTML = activeTypes().map(t => {
     const arr = offcov[t];
     const cls = arr.length >= 1 ? "covered" : "uncovered";
     return `
@@ -2625,19 +3350,42 @@ function renderTeamAnalysis() {
 // ════════════════════════════════════════════════════════
 //  TOOL 5:  RULETA  ALEATORIA
 // ════════════════════════════════════════════════════════
-// Approximate list of legendary/mythical IDs (covers most)
-const LEGENDARY_IDS = new Set([
-  144,145,146,150,151,
-  243,244,245,249,250,251,
-  377,378,379,380,381,382,383,384,385,386,
-  480,481,482,483,484,485,486,487,488,489,490,491,492,493,
-  494,638,639,640,641,642,643,644,645,646,647,648,649,
-  716,717,718,719,720,721,
-  772,773,785,786,787,788,789,790,791,792,793,794,795,796,797,798,799,800,801,802,803,804,805,806,807,808,809,
-  888,889,890,891,892,893,894,895,896,897,898,
-  905,
-  1001,1002,1003,1004,1007,1008,1009,1010,1014,1015,1016,1017,1020,1021,1022,1023,1024,1025
-]);
+// Legendarios y singulares según la propia API (is_legendary / is_mythical).
+// Antes era una lista escrita a mano: incompleta y con Pokémon que no lo son.
+const SPECIES_FLAGS_KEY = "species:flags:v1";
+let legendarySet = null;
+
+async function ensureLegendarySet() {
+  if (legendarySet) return legendarySet;
+  try {
+    const entry = await idbGet(SPECIES_FLAGS_KEY);
+    let rows;
+    if (entry && Date.now() - entry.ts < CACHE_TTL) {
+      rows = entry.data;
+    } else {
+      const query = `query SpeciesFlags {
+        pokemon_v2_pokemonspecies(where: {id: {_lte: 1025}}, order_by: {id: asc}, limit: 2000) {
+          id is_legendary is_mythical
+        }
+      }`;
+      const res = await fetch(GRAPHQL_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      if (json.errors) throw new Error("GraphQL");
+      rows = json.data?.pokemon_v2_pokemonspecies || [];
+      if (rows.length === 0) throw new Error("0 filas");
+      idbSet(SPECIES_FLAGS_KEY, { ts: Date.now(), data: rows });
+    }
+    legendarySet = new Set(rows.filter(r => r.is_legendary || r.is_mythical).map(r => r.id));
+  } catch {
+    legendarySet = null;   // no se pudo: el que llama decide qué hacer
+  }
+  return legendarySet;
+}
 
 function initRoulette() {
   TOOL_INITED.roulette = true;
@@ -2656,25 +3404,20 @@ async function rollRoulette() {
   btn.textContent = "🎲 ROLEANDO...";
 
   // Build pool
+  const notes = [];
   let pool = [...state.allPokemon];
   if (region) {
     const [mn, mx] = REGIONS[region];
     pool = pool.filter(p => p.id >= mn && p.id <= mx);
   }
   if (noLeg) {
-    pool = pool.filter(p => !LEGENDARY_IDS.has(p.id));
+    const legs = await ensureLegendarySet();
+    if (legs) pool = pool.filter(p => !legs.has(p.id));
+    else notes.push("No se pudo comprobar qué Pokémon son legendarios; ese filtro se ha ignorado.");
   }
-  // Type filter (lazy-fetch)
+  // Type filter (lazy-fetch) — reutiliza el mismo caché que los filtros
   if (type) {
-    if (!state.typeCache[type]) {
-      try {
-        const r = await fetch(`https://pokeapi.co/api/v2/type/${type}`);
-        const d = await r.json();
-        state.typeCache[type] = new Set(
-          d.pokemon.map(p => getId(p.pokemon.url)).filter(id => id >= 1 && id <= 1025)
-        );
-      } catch { state.typeCache[type] = new Set(); }
-    }
+    await ensureTypeCache(type);
     pool = pool.filter(p => state.typeCache[type].has(p.id));
   }
 
@@ -2684,44 +3427,50 @@ async function rollRoulette() {
     return;
   }
 
+  // Nunca se puede pedir más de lo que hay en el pool: si `count` lo supera,
+  // el relleno de abajo no tendría candidatos nuevos y no terminaría nunca.
+  const target = Math.min(count, pool.length);
+
   // Show animated placeholders
   const result = $("rouResult");
   result.innerHTML = "";
-  for (let i = 0; i < count; i++) {
+  for (let i = 0; i < target; i++) {
     const card = document.createElement("div");
     card.className = "rou-card spinning";
     card.innerHTML = `<img src="${spriteFor(pool[Math.floor(Math.random()*pool.length)].id)}"/>`;
     result.appendChild(card);
   }
 
-  // Fetch selected ones (with full data so we can show types)
-  const picked = [];
-  const usedTypes = new Set();
-  const tries = 200;
-  let attempts = 0;
-  while (picked.length < count && attempts < tries && pool.length > 0) {
-    attempts++;
-    const candidate = pool[Math.floor(Math.random() * pool.length)];
-    if (picked.find(p => p.id === candidate.id)) continue;
+  // Barajamos el pool una vez y lo recorremos: garantiza que termina y que no
+  // hay repetidos, sin depender de la suerte de los intentos aleatorios.
+  const bag = pool.slice();
+  for (let i = bag.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [bag[i], bag[j]] = [bag[j], bag[i]];
+  }
 
+  const picked    = [];
+  const usedTypes = new Set();
+  const skipped   = [];      // descartados solo por repetir tipo
+  for (const candidate of bag) {
+    if (picked.length >= target) break;
     if (unique) {
-      // Need full data to know types — fetch
-      try {
-        const data = await fetchPokemonByName(candidate.id);
-        const ts = data.types.map(t => t.type.name);
-        if (ts.some(t => usedTypes.has(t))) continue;
-        ts.forEach(t => usedTypes.add(t));
-        picked.push(data);
-      } catch {}
+      // Hace falta el detalle para conocer los tipos
+      let data;
+      try { data = await fetchPokemonByName(candidate.id); } catch { continue; }
+      const ts = data.types.map(t => t.type.name);
+      if (ts.some(t => usedTypes.has(t))) { skipped.push(data); continue; }
+      ts.forEach(t => usedTypes.add(t));
+      picked.push(data);
     } else {
       picked.push(candidate);
     }
   }
-  // If unique mode failed to fill, fill remainder normally
-  while (picked.length < count) {
-    const candidate = pool[Math.floor(Math.random() * pool.length)];
-    if (picked.find(p => p.id === candidate.id)) continue;
-    picked.push(candidate);
+  // "Sin repetir tipos" puede ser imposible de cumplir (hay 18 tipos y pools
+  // pequeños): completamos con los que habíamos descartado por tipo repetido.
+  for (const data of skipped) {
+    if (picked.length >= target) break;
+    picked.push(data);
   }
 
   // Resolve full data for any that don't have it
@@ -2746,5 +3495,18 @@ async function rollRoulette() {
       jumpToId(data.id);
     });
   }
+
+  // Quitar placeholders sobrantes (p. ej. si algún fetch falló)
+  while (result.children.length > final.length) result.lastElementChild.remove();
+
+  if (final.length < count) {
+    notes.unshift(`Solo hay ${final.length} Pokémon que cumplan esos criterios (pediste ${count}).`);
+  }
+  notes.forEach(text => {
+    const note = document.createElement("div");
+    note.className = "rou-note";
+    note.textContent = text;
+    result.appendChild(note);
+  });
   btn.disabled = false; btn.textContent = "🎲 GENERAR";
 }
