@@ -173,6 +173,17 @@ const VERSION_LABELS = {
 };
 function prettyVersion(v) { return VERSION_LABELS[v] || v.replace(/-/g," ").replace(/\b\w/g, c => c.toUpperCase()); }
 
+// Los 18 tipos estaban escritos a mano en tres sitios (filtro, ruleta y el
+// clon del 2.º tipo). Ahora salen todos de TYPE_LABELS_ES.
+function fillTypeSelect(sel, allLabel) {
+  if (!sel) return;
+  sel.innerHTML = `<option value="">${allLabel}</option>` +
+    Object.entries(TYPE_LABELS_ES)
+      .map(([key, label]) =>
+        `<option value="${key}">${label.charAt(0) + label.slice(1).toLowerCase()}</option>`)
+      .join("");
+}
+
 const REGION_CHORDS = {
   kanto:  [220.00, 277.18, 329.63, 415.30],   johto:  [246.94, 311.13, 369.99, 466.16],
   hoenn:  [261.63, 329.63, 392.00, 493.88],   sinnoh: [233.08, 277.18, 349.23, 440.00],
@@ -414,6 +425,9 @@ async function loadCatalog() {
     state.allPokemon = data.results.map(p => ({ id: getId(p.url), name: p.name }));
     catalogLoading.classList.add("hidden");
     pagTotal.textContent = state.allPokemon.length;
+    // El subtítulo decía "1025 ENTRIES" a mano; ahora sale del catálogo real
+    const sub = $("subtitle");
+    if (sub) sub.textContent = `NATIONAL DEX · ${state.allPokemon.length} ENTRIES`;
     pdexRenderRecent();
     pdexRenderProgress();
     markCatalogReady(true);
@@ -751,16 +765,19 @@ document.addEventListener("keydown", e => {
   }
   if (!modalOverlay.classList.contains("hidden")) {
     if (e.key === "Escape") closeModal();
+    else trapFocus(modalOverlay.querySelector(".modal-card"), e);
     return;
   }
   const helpEl = document.getElementById("helpOverlay");
   if (helpEl && !helpEl.classList.contains("hidden")) {
     if (e.key === "Escape" || e.key === "?") pdexToggleHelp();
+    else trapFocus(helpEl.querySelector(".help-card"), e);
     return;
   }
   const dataEl = document.getElementById("dataOverlay");
   if (dataEl && !dataEl.classList.contains("hidden")) {
-    if (e.key === "Escape") dataEl.classList.add("hidden");
+    if (e.key === "Escape") closeDialog(dataEl);
+    else trapFocus(dataEl.querySelector(".help-card"), e);
     return;
   }
   const recentEl = document.getElementById("recentPanel");
@@ -919,7 +936,7 @@ function renderAll(data, species) {
   stageNum.textContent   = `#${padId(data.id)}`;
   stageName.textContent  = data.name.toUpperCase();
   stageGenus.textContent = species.genus || "Pokémon";
-  renderStageTypes(types);
+  renderTypeBadges(stageTypes, types);
 
   $("pokeNumber").textContent = `#${padId(data.id)}`;
   $("pokeName").textContent   = data.name.toUpperCase();
@@ -933,7 +950,7 @@ function renderAll(data, species) {
   $("pokeWeight").textContent = `${(data.weight / 10).toFixed(1)} kg`;
   $("pokeExp").textContent    = data.base_experience ?? "—";
 
-  renderTypes(types);
+  renderTypeBadges($("typesRow"), types);
   renderGenNote(data, types);
   renderDescription(species.flavors || []);
   renderAbilities(data.abilities);
@@ -1022,23 +1039,16 @@ function renderBreeding(species) {
                  + (cells.length ? cells.join("") : '<span class="moves-empty">Sin datos.</span>');
 }
 
-function renderStageTypes(types) {
-  stageTypes.innerHTML = "";
+// Una sola función: renderStageTypes y renderTypes eran idénticas salvo el
+// contenedor de destino.
+function renderTypeBadges(container, types) {
+  if (!container) return;
+  container.innerHTML = "";
   types.forEach(t => {
     const s = document.createElement("span");
     s.className = `type-badge type-${t.type.name}`;
     s.textContent = t.type.name.toUpperCase();
-    stageTypes.appendChild(s);
-  });
-}
-function renderTypes(types) {
-  const row = $("typesRow");
-  row.innerHTML = "";
-  types.forEach(t => {
-    const s = document.createElement("span");
-    s.className = `type-badge type-${t.type.name}`;
-    s.textContent = t.type.name.toUpperCase();
-    row.appendChild(s);
+    container.appendChild(s);
   });
 }
 function renderAbilities(abilities) {
@@ -1431,7 +1441,6 @@ function renderLocations(arr) {
 //  VARIETIES (alternate forms)
 // ════════════════════════════════════════════════════════
 function renderVarieties(varieties, currentName) {
-  const others = varieties.filter(v => v.pokemon.name !== varieties[0].pokemon.name || varieties.length > 1);
   if (varieties.length <= 1) {
     varietiesWrap.classList.add("hidden");
     return;
@@ -1474,13 +1483,45 @@ async function loadVariety(name) {
 // ════════════════════════════════════════════════════════
 //  MODAL  (shared between abilities & moves)
 // ════════════════════════════════════════════════════════
+// ── Foco en diálogos ─────────────────────────────────────
+// Guardar de dónde veníamos, atrapar el Tab dentro del diálogo y devolver el
+// foco al cerrar. Sin esto, con teclado te quedabas navegando por detrás.
+let lastFocused = null;
+
+function trapFocus(container, e) {
+  if (e.key !== "Tab" || !container) return;
+  const list = [...container.querySelectorAll(
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')]
+    .filter(el => !el.disabled && el.offsetParent !== null);
+  if (list.length === 0) return;
+  const first = list[0], last = list[list.length - 1];
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+}
+function openDialog(overlay, focusTarget) {
+  if (!overlay) return;
+  lastFocused = document.activeElement;
+  overlay.classList.remove("hidden");
+  (focusTarget || overlay.querySelector("button"))?.focus();
+}
+function closeDialog(overlay) {
+  if (!overlay) return;
+  overlay.classList.add("hidden");
+  if (lastFocused && document.contains(lastFocused)) lastFocused.focus();
+  lastFocused = null;
+}
+
 function openModal() {
+  lastFocused = document.activeElement;
   modalOverlay.classList.remove("hidden");
   modalContent.classList.add("hidden");
   modalLoading.classList.remove("hidden");
+  modalClose.focus();
 }
 function closeModal() {
   modalOverlay.classList.add("hidden");
+  if (lastFocused && document.contains(lastFocused)) lastFocused.focus();
+  lastFocused = null;
 }
 modalClose.addEventListener("click", closeModal);
 modalOverlay.addEventListener("click", e => {
@@ -2041,12 +2082,11 @@ function pdexRefreshCompactRow(id) {
   row.querySelector(".cl-caught").classList.toggle("on", PDEX.caught.has(id));
   row.querySelector(".cl-fav").classList.toggle("on", PDEX.favs.has(id));
 }
-function pdexAfterFilter() { /* reserved */ }
-
 // ── panel de ayuda (atajos) ──────────────────────────────
 function pdexToggleHelp() {
   const ov = $("helpOverlay"); if (!ov) return;
-  ov.classList.toggle("hidden");
+  if (ov.classList.contains("hidden")) openDialog(ov, $("helpClose"));
+  else closeDialog(ov);
 }
 
 // ── build UI ─────────────────────────────────────────────
@@ -2147,7 +2187,7 @@ function pdexBuildControls() {
   dataOv.className = "help-overlay hidden";
   dataOv.id = "dataOverlay";
   dataOv.innerHTML = `
-    <div class="help-card">
+    <div class="help-card" role="dialog" aria-modal="true" aria-label="Tus datos">
       <button class="help-close" id="dataClose">✕</button>
       <h3 class="help-title">⇄ TUS DATOS</h3>
       <p class="data-desc">
@@ -2168,7 +2208,7 @@ function pdexBuildControls() {
   help.className = "help-overlay hidden";
   help.id = "helpOverlay";
   help.innerHTML = `
-    <div class="help-card">
+    <div class="help-card" role="dialog" aria-modal="true" aria-label="Atajos de teclado">
       <button class="help-close" id="helpClose">✕</button>
       <h3 class="help-title">⌨ ATAJOS DE TECLADO</h3>
       <div class="help-grid">
@@ -2239,10 +2279,14 @@ function pdexBindControls() {
   });
   $("chipView").addEventListener("click", pdexToggleView);
   $("chipHelp").addEventListener("click", pdexToggleHelp);
-  $("chipData").addEventListener("click", () => $("dataOverlay").classList.toggle("hidden"));
-  $("dataClose").addEventListener("click", () => $("dataOverlay").classList.add("hidden"));
+  $("chipData").addEventListener("click", () => {
+    const ov = $("dataOverlay");
+    if (ov.classList.contains("hidden")) openDialog(ov, $("dataExport"));
+    else closeDialog(ov);
+  });
+  $("dataClose").addEventListener("click", () => closeDialog($("dataOverlay")));
   $("dataOverlay").addEventListener("click", e => {
-    if (e.target === $("dataOverlay")) $("dataOverlay").classList.add("hidden");
+    if (e.target === $("dataOverlay")) closeDialog($("dataOverlay"));
   });
   $("dataExport").addEventListener("click", exportData);
   $("dataImportBtn").addEventListener("click", () => $("dataImportFile").click());
@@ -2342,6 +2386,9 @@ function pdexBindControls() {
 
 function pdexInit() {
   pdexLoad();
+  // Antes que pdexBuildControls: el 2.º tipo clona las opciones de filterType
+  fillTypeSelect(filterType, "Todos");
+  fillTypeSelect($("rouType"), "Cualquiera");
   const gsel = $("filterGen");
   if (gsel) {
     gsel.innerHTML = [9,8,7,6,5,4,3,2,1]
@@ -2501,6 +2548,9 @@ async function importData(file) {
 // ════════════════════════════════════════════════════════
 //  INIT
 // ════════════════════════════════════════════════════════
+const yearEl = $("footerYear");
+if (yearEl) yearEl.textContent = new Date().getFullYear();
+
 pdexInit();
 loadCatalog();
 
@@ -2523,7 +2573,9 @@ const TOOL_INITED = {};
 async function switchMode(mode) {
   state.mode = mode;
   document.querySelectorAll(".mode-tab").forEach(t => {
-    t.classList.toggle("active", t.dataset.mode === mode);
+    const on = t.dataset.mode === mode;
+    t.classList.toggle("active", on);
+    t.setAttribute("aria-selected", on ? "true" : "false");
   });
   const ids = {
     pokedex:"modePokedex", quiz:"modeQuiz", duel:"modeDuel",

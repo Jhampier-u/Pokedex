@@ -73,7 +73,7 @@
       </div>
       <div class="header-main">
         <h1 class="main-title">POKÉDEX</h1>
-        <p class="subtitle">NATIONAL DEX · 1025 ENTRIES</p>
+        <p class="subtitle" id="subtitle">NATIONAL DEX</p>
       </div>
       <div class="header-side">
         <button class="hw-btn hw-btn-sm" id="musicBtn" title="Música ambiente (M)">
@@ -88,12 +88,12 @@
     </header>
 
     <!-- MODE SWITCHER -->
-    <nav class="mode-switcher" id="modeSwitcher">
-      <button class="mode-tab active" data-mode="pokedex">📖 <span>POKÉDEX</span></button>
-      <button class="mode-tab" data-mode="quiz">❓ <span>¿QUIÉN ES?</span></button>
-      <button class="mode-tab" data-mode="duel">⚔️ <span>BATALLA</span></button>
-      <button class="mode-tab" data-mode="team">🛡️ <span>EQUIPO</span></button>
-      <button class="mode-tab" data-mode="roulette">🎲 <span>RULETA</span></button>
+    <nav class="mode-switcher" id="modeSwitcher" role="tablist" aria-label="Modos">
+      <button class="mode-tab active" data-mode="pokedex" role="tab" aria-selected="true"  aria-controls="modePokedex">📖 <span>POKÉDEX</span></button>
+      <button class="mode-tab"        data-mode="quiz"    role="tab" aria-selected="false" aria-controls="modeQuiz">❓ <span>¿QUIÉN ES?</span></button>
+      <button class="mode-tab"        data-mode="duel"    role="tab" aria-selected="false" aria-controls="modeDuel">⚔️ <span>BATALLA</span></button>
+      <button class="mode-tab"        data-mode="team"    role="tab" aria-selected="false" aria-controls="modeTeam">🛡️ <span>EQUIPO</span></button>
+      <button class="mode-tab"        data-mode="roulette" role="tab" aria-selected="false" aria-controls="modeRoulette">🎲 <span>RULETA</span></button>
     </nav>
 
     <!-- BODY -->
@@ -102,34 +102,15 @@
       <!-- ═══════════════════════════════
            MODE: POKÉDEX  (catalog + detail)
       ═══════════════════════════════ -->
-      <section class="mode-view" id="modePokedex">
+      <section class="mode-view" id="modePokedex" role="tabpanel" aria-label="Pokédex">
 
       <!-- FILTER BAR -->
       <div class="filter-bar">
         <div class="filter-row">
           <div class="filter-group">
             <span class="filter-label">▸ TIPO</span>
-            <select class="filter-sel" id="filterType">
-              <option value="">Todos</option>
-              <option value="normal">Normal</option>
-              <option value="fire">Fuego</option>
-              <option value="water">Agua</option>
-              <option value="grass">Planta</option>
-              <option value="electric">Eléctrico</option>
-              <option value="ice">Hielo</option>
-              <option value="fighting">Lucha</option>
-              <option value="poison">Veneno</option>
-              <option value="ground">Tierra</option>
-              <option value="flying">Volador</option>
-              <option value="psychic">Psíquico</option>
-              <option value="bug">Bicho</option>
-              <option value="rock">Roca</option>
-              <option value="ghost">Fantasma</option>
-              <option value="dragon">Dragón</option>
-              <option value="dark">Siniestro</option>
-              <option value="steel">Acero</option>
-              <option value="fairy">Hada</option>
-            </select>
+            <!-- Opciones generadas en JS desde TYPE_LABELS_ES (fuente única) -->
+            <select class="filter-sel" id="filterType"></select>
           </div>
           <div class="filter-group">
             <span class="filter-label">▸ REGLAS</span>
@@ -150,7 +131,7 @@
             <input class="filter-input" id="filterName" placeholder="pikachu, 25..." autocomplete="off" />
           </div>
           <div class="filter-count-wrap">
-            <span class="filter-count" id="filterCount">— Pokémon</span>
+            <span class="filter-count" id="filterCount" role="status" aria-live="polite">— Pokémon</span>
           </div>
         </div>
         <!-- Personal-dex controls (favoritos / capturados / gen tabs / stats / vista) -->
@@ -310,7 +291,7 @@
 
       <!-- ═══ MODAL (moves / abilities) ═══ -->
       <div class="modal-overlay hidden" id="modalOverlay">
-        <div class="modal-card">
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalContent">
           <button class="modal-close" id="modalClose" aria-label="Cerrar">✕</button>
           <div class="modal-loading hidden" id="modalLoading">
             <div class="ball"></div>
@@ -354,7 +335,7 @@
       <!-- ═══════════════════════════════
            MODE: ¿QUIÉN ES ESE POKÉMON?
       ═══════════════════════════════ -->
-      <section class="mode-view hidden" id="modeQuiz">
+      <section class="mode-view hidden" id="modeQuiz" role="tabpanel" aria-label="¿Quién es ese Pokémon?">
         <div class="quiz-card">
           <div class="quiz-header">
             <h2 class="quiz-title">¿QUIÉN ES ESE POKÉMON?</h2>
@@ -387,7 +368,7 @@
       <!-- ═══════════════════════════════
            MODE: SIMULADOR DE BATALLA
       ═══════════════════════════════ -->
-      <section class="mode-view hidden" id="modeDuel">
+      <section class="mode-view hidden" id="modeDuel" role="tabpanel" aria-label="Simulador de batalla">
         <div class="duel-wrap">
           <h2 class="tool-title">⚔️ SIMULADOR DE BATALLA</h2>
           <p class="tool-subtitle">Comparación completa, tipos, daño en ambas direcciones y pronóstico</p>
@@ -461,7 +442,7 @@
       <!-- ═══════════════════════════════
            MODE: CONSTRUCTOR DE EQUIPO
       ═══════════════════════════════ -->
-      <section class="mode-view hidden" id="modeTeam">
+      <section class="mode-view hidden" id="modeTeam" role="tabpanel" aria-label="Constructor de equipo">
         <div class="team-wrap">
           <div class="team-header">
             <h2 class="tool-title">🛡️ CONSTRUCTOR DE EQUIPO</h2>
@@ -519,7 +500,7 @@
       <!-- ═══════════════════════════════
            MODE: RULETA ALEATORIA
       ═══════════════════════════════ -->
-      <section class="mode-view hidden" id="modeRoulette">
+      <section class="mode-view hidden" id="modeRoulette" role="tabpanel" aria-label="Ruleta aleatoria">
         <div class="rou-wrap">
           <h2 class="tool-title">🎲 RULETA NUZLOCKE</h2>
           <p class="tool-subtitle">Genera un equipo aleatorio para tu próximo run</p>
@@ -545,18 +526,7 @@
             </div>
             <div class="rou-field">
               <label>TIPO</label>
-              <select id="rouType" class="rou-input">
-                <option value="">Cualquiera</option>
-                <option value="normal">Normal</option><option value="fire">Fuego</option>
-                <option value="water">Agua</option><option value="grass">Planta</option>
-                <option value="electric">Eléctrico</option><option value="ice">Hielo</option>
-                <option value="fighting">Lucha</option><option value="poison">Veneno</option>
-                <option value="ground">Tierra</option><option value="flying">Volador</option>
-                <option value="psychic">Psíquico</option><option value="bug">Bicho</option>
-                <option value="rock">Roca</option><option value="ghost">Fantasma</option>
-                <option value="dragon">Dragón</option><option value="dark">Siniestro</option>
-                <option value="steel">Acero</option><option value="fairy">Hada</option>
-              </select>
+              <select id="rouType" class="rou-input"></select>
             </div>
             <div class="rou-field rou-toggles">
               <label class="rou-check">
@@ -577,7 +547,7 @@
     </main>
 
     <footer class="site-footer">
-      <span>© 2025 Pokédex Research</span>
+      <span>© <span id="footerYear">2025</span> Pokédex Research</span>
       <span class="footer-dot">·</span>
       <span>Markus Sounds</span>
       <span class="footer-dot">·</span>

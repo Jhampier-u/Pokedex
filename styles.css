@@ -882,8 +882,6 @@ body {
   border-bottom: 2px solid #2a2a2a;
   padding-bottom: 8px;
 }
-.section-hint { font-size: 12px !important; }
-
 .abilities-list { display: flex; flex-wrap: wrap; gap: 10px; }
 .ability-tag {
   font-size: 19px; background: #111;
@@ -1346,8 +1344,10 @@ kbd {
    DEPTH ADD-ONS
 ══════════════════════════════════════ */
 
+/* 12px, no 9px: antes había una segunda regla arriba con !important que
+   ganaba a esta. Se fusionan aquí para no necesitar el !important. */
 .section-hint {
-  font-size: 9px;
+  font-size: 12px;
   font-weight: normal;
   color: rgba(255,248,231,0.35);
   margin-left: 8px;
