@@ -90,6 +90,34 @@ Mismo tipo de error: las rutas compartibles se probaron cambiando
 recargando con el hash puesto. Estuvieron rotas desde el primer día sin que
 saliera en ninguna prueba.
 
+### Auditar maquetación midiendo, no mirando
+
+No siempre se puede capturar pantalla (el panel a veces no compone frames).
+Este auditor encuentra contenido **inalcanzable**: cajas cuyo contenido no cabe
+y que además no se pueden desplazar.
+
+```js
+[...document.querySelectorAll('.mode-view:not(.hidden) *')]
+  .filter(el => el.scrollWidth > el.clientWidth + 2 && el.clientWidth > 0
+    && ['visible','hidden'].includes(getComputedStyle(el).overflowX))
+  .map(el => `${el.className} (${el.clientWidth}→${el.scrollWidth})`)
+```
+
+Excluye `.stage` y `.stage-section`: el carrusel coloca sprites fuera de
+pantalla a propósito y los recorta.
+
+### El culpable de un desbordamiento suele ser `min-width: auto` en un grid
+
+Perdí tres intentos poniendo `min-width: 0` a los hijos equivocados. Un
+**elemento de grid** (hijo directo del contenedor con `display: grid`) lleva
+`min-width: auto` y no encoge por debajo de su contenido, aunque el grid sí
+quepa. `.team-analysis` es grid y `.team-section` era el elemento: había que
+poner `min-width: 0` **al elemento, no a sus hijos**.
+
+Para localizarlo sin adivinar, recorre la cadena de ancestros imprimiendo
+`display`, `width`, `minWidth` y `gridTemplateColumns`. El síntoma es una
+columna más ancha que su propio contenedor.
+
 ### Cuidado con las métricas propias
 
 El «108 selectores CSS duplicados» que reporté era un artefacto de mi propio

@@ -273,6 +273,35 @@ Arreglo, quitando los diálogos bloqueantes en vez de parchearlos:
 Verificado con `prompt` y `confirm` redefinidos para **marcar fallo** si
 alguien los llama: no se usa ninguno.
 
+## Tanda 16 — Barrido de la misma clase de bug + maquetación en móvil
+
+Tras el bug del `prompt()`, se buscó si quedaba más de lo mismo. Sí quedaba.
+
+**Diálogos bloqueantes restantes:** dos `alert()` (fallo al cargar las Pokédex
+regionales y la tabla de tipos histórica) y un `prompt()` de reserva al copiar
+el enlace. Todos pasan al `toast()`, que ya existía. Si `alert` está bloqueado,
+el usuario se quedaba **sin ningún aviso** de que algo había fallado.
+
+**Fallos silenciosos:** `loadCenterDetail` tenía un `catch {}` vacío —señalado
+en el análisis inicial y nunca arreglado—. Si la ficha fallaba, se quedaba con
+los datos del Pokémon anterior sin explicar nada. Igual en `loadVariety`.
+
+**Maquetación en móvil (375px), medida, no supuesta:**
+- La **cadena evolutiva se salía y era inalcanzable**: Eevee tiene 9 nodos que
+  ocupan 396px en un contenedor de 294px, y como la página no hace scroll
+  horizontal, las últimas evoluciones no se podían ver. Ahora `overflow-x:auto`.
+- El **análisis de equipo** desbordaba 42px. La causa costó tres intentos: no
+  era el radar ni el contenido, era `min-width: auto` en `.team-section`, que
+  es elemento de grid de `.team-analysis`. Ver `05-VERIFICACION.md`.
+- Lo mismo en `.team-roles`, y columnas fijas de 320px y 70+130+130px que en
+  375px no caben.
+
+Quedan dos desbordes de ≤8px (`.tdc-member` y un `.section-title`) dentro de
+sus propias tarjetas, sin contenido inalcanzable. Se dejan a propósito.
+
+Verificado en los 6 modos a 375px y en escritorio, con `alert`, `confirm` y
+`prompt` redefinidos para marcar fallo: no se usa ninguno.
+
 ## Correcciones a lo que dije por el camino
 
 Tres cosas que reporté mal y conviene no repetir:

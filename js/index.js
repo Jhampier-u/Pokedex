@@ -956,7 +956,12 @@ async function loadCenterDetail() {
     loadLocations(cur.id, seq);
 
   } catch {
-    /* network error */
+    // Antes se tragaba el error: la ficha se quedaba con los datos del Pokémon
+    // anterior y sin explicar nada. Ahora al menos se dice qué pasó.
+    if (seq === detailRequestSeq) {
+      toast("No se pudo cargar la ficha. ¿Sigues conectado?");
+      pokeDescription.textContent = "No se pudieron cargar los datos de este Pokémon.";
+    }
   } finally {
     if (seq === detailRequestSeq) {
       cardLoading.classList.add("hidden");
@@ -1555,7 +1560,9 @@ async function loadVariety(name) {
     const species = (cur && state.speciesCache[cur.id])
                  || { genus: "Pokémon", flavors: [], varieties: [] };
     renderAll(data, species);
-  } catch {} finally {
+  } catch {
+    toast("No se pudo cargar esa forma alternativa.");
+  } finally {
     cardLoading.classList.add("hidden");
     cardWrapper.classList.remove("fading");
   }
@@ -2444,7 +2451,7 @@ async function pdexSetRegionMode(modo) {
     dexTabs.classList.remove("loading");
     if (!ok) {
       dexTabs.classList.add("hidden");
-      alert("No se pudieron cargar las Pokédex regionales. Revisa tu conexión.");
+      toast("No se pudieron cargar las Pokédex regionales. Revisa tu conexión.");
       document.querySelector('.gm-btn[data-rmode="gen"]').click();
       return;
     }
@@ -2510,7 +2517,7 @@ function pdexBindControls() {
       sel.disabled = false;
       if (!ok) {
         sel.value = String(state.gen);
-        alert("No se pudo cargar la tabla de tipos histórica. Revisa tu conexión.");
+        toast("No se pudo cargar la tabla de tipos histórica. Revisa tu conexión.");
         return;
       }
     }
@@ -2679,7 +2686,10 @@ async function copyShareLink() {
     await navigator.clipboard.writeText(url);
     toast("Enlace copiado ✓");
   } catch {
-    window.prompt("Copia el enlace:", url);   // sin permiso de portapapeles
+    // Sin permiso de portapapeles. El enlace ya está en la barra de
+    // direcciones (syncHash lo acaba de poner), así que basta con decirlo:
+    // un prompt() aquí puede no aparecer siquiera.
+    toast("Copia el enlace de la barra de direcciones");
   }
 }
 
