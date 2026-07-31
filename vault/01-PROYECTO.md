@@ -37,7 +37,9 @@ state = {
   shinyMode, animatedMode, musicOn,
   mode,        // pokedex | quiz | duel | team | roulette | nuzlocke
   gen,         // reglas activas: 9 = actuales
-  region,      // filtro de región; "" = todo. Su ÚNICO control son los tabs
+  region,      // generación de origen; su ÚNICO control son los tabs
+  regionMode,  // "gen" | "dex" — los dos criterios de región
+  dex,         // Pokédex regional activa cuando regionMode === "dex"
 }
 ```
 
@@ -50,8 +52,8 @@ Además: `PDEX` (favoritos, capturados, notas, recientes), `pdexUI`,
    IndexedDB (TTL 30 días); si hay acierto no toca la red. Además deduplica
    peticiones en vuelo: dos sitios pidiendo lo mismo comparten una llamada.
 2. **GraphQL** (`beta.pokeapi.co/graphql/v1beta`) para cargas masivas: stats de
-   los 1025, flags de legendario, las 25 naturalezas y los encuentros por zona
-   de cada juego. Una petición cada una.
+   los 1025, flags de legendario, las 25 naturalezas, los encuentros por zona de
+   cada juego y la pertenencia a Pokédex regionales. Una petición cada una.
 3. **Service worker** — `network-first` para los archivos de la app,
    `cache-first` para sprites y respuestas de API.
 
@@ -65,6 +67,7 @@ excepciones legítimas son las consultas GraphQL, que son POST.
 | `effectiveness(atk, defTypes)` | **Única** fuente de la tabla de tipos. Respeta la generación activa |
 | `activeChart` / `activeTypes()` | Tabla vigente según `state.gen` |
 | `apiFetch(url)` | Fetch con caché persistente |
+| `detailCachePut(k, d)` | Caché en memoria acotada a 300 entradas (LRU) |
 | `applySprite(img, id, opts)` | Sprite con fallback controlado (un reintento) |
 | `renderTypeBadges(cont, types)` | Badges de tipo, un solo sitio |
 | `computeStat(...)` / `actualStatsFor(...)` | Fórmula oficial de stats |
@@ -85,7 +88,7 @@ Los atajos de teclado solo actúan si `state.mode === "pokedex"`.
 
 `IndexedDB` (`pokedex-cache` / store `api`): respuestas de la API, más las
 claves especiales `stats:all:v1`, `species:flags:v1`, `natures:v1`,
-`nuz:versions:v1` y `nuz:pool:{version}:v1`.
+`nuz:versions:v1`, `nuz:pool:{version}:v1` y `dex:members:v1`.
 
 ## Convenciones
 

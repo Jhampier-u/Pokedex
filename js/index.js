@@ -213,6 +213,8 @@ const state = {
                             // Los tabs de generación son su ÚNICO control: antes
                             // había además un <select> que hacía exactamente lo
                             // mismo y había que mantener sincronizado.
+  regionMode:   "gen",      // "gen" = por generación de origen · "dex" = por Pokédex regional
+  dex:          "",         // Pokédex regional activa cuando regionMode === "dex"
   currentRegion: "kanto",
   currentVariety: null,    // alternate-form override (pokemon name); null = default
 };
@@ -473,7 +475,14 @@ async function applyFilters({ resetIndex = false } = {}) {
   let list = state.allPokemon.filter(p => {
     if (typeIds  && !typeIds.has(p.id))  return false;
     if (type2Ids && !type2Ids.has(p.id)) return false;
-    if (regionVal) {
+    if (state.regionMode === "dex") {
+      // Pertenencia real a una Pokédex regional (incluye Pokémon de gens
+      // anteriores). No confundir con el filtro por generación de origen.
+      if (state.dex) {
+        const miembros = dexMembers[state.dex];
+        if (!miembros || !miembros.has(p.id)) return false;
+      }
+    } else if (regionVal) {
       const [mn, mx] = REGIONS[regionVal];
       if (p.id < mn || p.id > mx) return false;
     }
@@ -668,6 +677,7 @@ function jumpToId(id) {
   filterName.value = "";
   filterType.value = "";
   state.region     = "";
+  state.dex        = "";
   const type2 = $("filterType2");
   if (type2) type2.value = "";
 
@@ -682,6 +692,7 @@ function jumpToId(id) {
     $("chipStats")?.classList.remove("on");
   }
   pdexSyncGenTabs();
+  pdexSyncDexTabs();
 
   applyFilters({ resetIndex: true }).then(() => {
     const i2 = state.filtered.findIndex(p => p.id === id);
@@ -849,12 +860,25 @@ function scheduleDetailLoad() {
   detailTimer = setTimeout(loadCenterDetail, 380);
 }
 
+// La caché en memoria crecía sin tope: cada objeto /pokemon trae la lista
+// completa de movimientos, así que navegar mucho rato acumulaba decenas de MB.
+// IndexedDB sigue teniendo todo, esto solo acota lo que vive en RAM.
+const DETAIL_MAX = 300;
+const detailLRU  = [];
+function detailCachePut(key, data) {
+  if (!(key in state.detailCache)) detailLRU.push(key);
+  state.detailCache[key] = data;
+  while (detailLRU.length > DETAIL_MAX) {
+    delete state.detailCache[detailLRU.shift()];
+  }
+}
+
 async function fetchPokemonByName(nameOrId) {
   const key = String(nameOrId);
   if (state.detailCache[key]) return state.detailCache[key];
   const data = await apiFetch(`https://pokeapi.co/api/v2/pokemon/${nameOrId}`);
-  state.detailCache[key]    = data;
-  state.detailCache[data.id] = data;
+  detailCachePut(key, data);
+  detailCachePut(String(data.id), data);
   return data;
 }
 
@@ -1819,6 +1843,66 @@ const REGION_META = {
 };
 const STAT_ORDER = ["hp","attack","defense","special-attack","special-defense","speed"];
 
+// ── Pokédex regionales como filtro ───────────────────────
+// Eje distinto al de generación: la Pokédex de Alola tiene 403 entradas, la
+// mayoría de generaciones anteriores. Por eso es un modo aparte y no sustituye
+// a los tabs de generación (ver corrección nº 0 en vault/02-HISTORIAL.md).
+const DEX_FILTERS = [
+  { key:"kanto",           label:"Kanto",       sub:"Gen I",    color:"#E3350D" },
+  { key:"updated-johto",   label:"Johto",       sub:"HG/SS",    color:"#C7A008" },
+  { key:"updated-hoenn",   label:"Hoenn",       sub:"ROZA",     color:"#2AA35B" },
+  { key:"extended-sinnoh", label:"Sinnoh",      sub:"Platino",  color:"#6C8CC7" },
+  { key:"updated-unova",   label:"Teselia",     sub:"N2/B2",    color:"#5A5A6E" },
+  { key:"kalos-central",   label:"Kalos",       sub:"Centro",   color:"#8E44AD" },
+  { key:"kalos-coastal",   label:"Kalos",       sub:"Costa",    color:"#9B59B6" },
+  { key:"kalos-mountain",  label:"Kalos",       sub:"Montaña",  color:"#A569BD" },
+  { key:"updated-alola",   label:"Alola",       sub:"US/UL",    color:"#F39C12" },
+  { key:"galar",           label:"Galar",       sub:"Gen VIII", color:"#C0392B" },
+  { key:"isle-of-armor",   label:"I. Armadura", sub:"DLC",      color:"#16A085" },
+  { key:"crown-tundra",    label:"T. Corona",   sub:"DLC",      color:"#2980B9" },
+  { key:"hisui",           label:"Hisui",       sub:"Leyendas", color:"#7F8C8D" },
+  { key:"paldea",          label:"Paldea",      sub:"Gen IX",   color:"#16A085" },
+  { key:"kitakami",        label:"Kitakami",    sub:"DLC",      color:"#27AE60" },
+  { key:"blueberry",       label:"Área Azul",   sub:"DLC",      color:"#2E86C1" },
+];
+const DEX_MEMBERS_KEY = "dex:members:v1";
+const dexMembers = {};   // { nombreDex: Set(ids) }
+
+async function ensureDexMembers() {
+  if (Object.keys(dexMembers).length) return true;
+  try {
+    const entry = await idbGet(DEX_MEMBERS_KEY);
+    let raw;
+    if (entry && Date.now() - entry.ts < CACHE_TTL) {
+      raw = entry.data;
+    } else {
+      const query = `query DexMembers {
+        pokemon_v2_pokemondexnumber(
+          where: {pokemon_v2_pokedex: {is_main_series: {_eq: true}},
+                  pokemon_species_id: {_lte: 1025}}
+        ) { pokedex_id pokemon_species_id }
+        pokemon_v2_pokedex(where: {is_main_series: {_eq: true}}) { id name }
+      }`;
+      const res  = await fetch(GRAPHQL_URL, { method:"POST",
+        headers:{"Content-Type":"application/json"}, body: JSON.stringify({ query }) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      if (json.errors) throw new Error("GraphQL");
+      const idToName = {};
+      (json.data?.pokemon_v2_pokedex || []).forEach(d => { idToName[d.id] = d.name; });
+      raw = {};
+      (json.data?.pokemon_v2_pokemondexnumber || []).forEach(n => {
+        const name = idToName[n.pokedex_id];
+        if (name) (raw[name] ||= []).push(n.pokemon_species_id);
+      });
+      if (!Object.keys(raw).length) throw new Error("0 filas");
+      idbSet(DEX_MEMBERS_KEY, { ts: Date.now(), data: raw });
+    }
+    Object.entries(raw).forEach(([k, v]) => { dexMembers[k] = new Set(v); });
+    return true;
+  } catch { return false; }
+}
+
 // ── storage ──────────────────────────────────────────────
 function pdexLoad() {
   try { PDEX.favs   = new Set(JSON.parse(localStorage.getItem("pdex_favs")   || "[]")); } catch {}
@@ -2033,14 +2117,20 @@ function pdexRenderProgress() {
   const wrap = $("dexProgressWrap"); if (!wrap) return;
   const total = state.allPokemon.length || 1025;
   const caught = PDEX.caught.size;
-  const regVal = state.region;
   let regHtml = "";
-  if (regVal && REGION_META[regVal]) {
-    const [mn, mx] = REGIONS[regVal];
+  if (state.regionMode === "dex" && state.dex && dexMembers[state.dex]) {
+    const miembros = dexMembers[state.dex];
+    const meta = DEX_FILTERS.find(d => d.key === state.dex);
+    let c = 0; for (const id of PDEX.caught) if (miembros.has(id)) c++;
+    regHtml = `<span class="dexp-region" style="--rc:${meta?.color || "#888"}">
+      ${meta ? `${meta.label} (${meta.sub})` : prettyName(state.dex)}:
+      <b>${c}/${miembros.size}</b></span>`;
+  } else if (state.regionMode === "gen" && state.region && REGION_META[state.region]) {
+    const [mn, mx] = REGIONS[state.region];
     let c = 0; for (const id of PDEX.caught) if (id >= mn && id <= mx) c++;
     const rt = mx - mn + 1;
-    regHtml = `<span class="dexp-region" style="--rc:${REGION_META[regVal].color}">
-      ${REGION_META[regVal].label}: <b>${c}/${rt}</b></span>`;
+    regHtml = `<span class="dexp-region" style="--rc:${REGION_META[state.region].color}">
+      ${REGION_META[state.region].label}: <b>${c}/${rt}</b></span>`;
   }
   const pct = Math.round(caught / total * 100);
   wrap.innerHTML = `
@@ -2166,7 +2256,14 @@ function pdexBuildControls() {
         <button class="filter-chip" id="chipHelp" title="Atajos de teclado (?)">? Ayuda</button>
       </div>
     </div>
-    <div class="gen-tabs" id="genTabs"></div>`;
+    <div class="gen-mode" id="genMode" role="group" aria-label="Criterio de región">
+      <button class="gm-btn active" data-rmode="gen"
+              title="Pokémon introducidos en esa generación">Por generación</button>
+      <button class="gm-btn" data-rmode="dex"
+              title="Pokémon que aparecen en esa Pokédex, incluidos los de generaciones anteriores">Por Pokédex regional</button>
+    </div>
+    <div class="gen-tabs" id="genTabs"></div>
+    <div class="dex-tabs hidden" id="dexTabs"></div>`;
 
   // generation tabs
   const genTabs = $("genTabs");
@@ -2185,6 +2282,24 @@ function pdexBuildControls() {
   };
   mkTab("", "TODAS", "Nacional", "#CFCFCF");
   Object.entries(REGION_META).forEach(([k, m]) => mkTab(k, m.label, "Gen " + m.roman, m.color));
+
+  // Tabs de Pokédex regional (el otro criterio)
+  const dexTabs = $("dexTabs");
+  const mkDexTab = (val, label, sub, color) => {
+    const b = document.createElement("button");
+    b.className = "gen-tab";
+    b.dataset.dex = val;
+    b.style.setProperty("--gc", color || "#888");
+    b.innerHTML = `<span class="gt-label">${label}</span>${sub ? `<span class="gt-sub">${sub}</span>` : ""}`;
+    b.addEventListener("click", async () => {
+      state.dex = val;
+      pdexSyncDexTabs();
+      await applyFilters({ resetIndex: true });
+    });
+    dexTabs.appendChild(b);
+  };
+  mkDexTab("", "TODAS", "Nacional", "#CFCFCF");
+  DEX_FILTERS.forEach(d => mkDexTab(d.key, d.label, d.sub, d.color));
 
   // stat filter panel
   const STAT_UI = [
@@ -2312,8 +2427,37 @@ function pdexBuildControls() {
 }
 function pdexSyncGenTabs() {
   const val = state.region;
-  document.querySelectorAll(".gen-tab").forEach(t =>
+  document.querySelectorAll("#genTabs .gen-tab").forEach(t =>
     t.classList.toggle("active", t.dataset.region === val));
+}
+function pdexSyncDexTabs() {
+  document.querySelectorAll("#dexTabs .gen-tab").forEach(t =>
+    t.classList.toggle("active", t.dataset.dex === state.dex));
+}
+async function pdexSetRegionMode(modo) {
+  const genTabs = $("genTabs"), dexTabs = $("dexTabs");
+  if (modo === "dex") {
+    // 299 KB de pertenencias; solo se piden si el usuario entra en este modo
+    dexTabs.classList.remove("hidden");
+    dexTabs.classList.add("loading");
+    const ok = await ensureDexMembers();
+    dexTabs.classList.remove("loading");
+    if (!ok) {
+      dexTabs.classList.add("hidden");
+      alert("No se pudieron cargar las Pokédex regionales. Revisa tu conexión.");
+      document.querySelector('.gm-btn[data-rmode="gen"]').click();
+      return;
+    }
+  }
+  state.regionMode = modo;
+  document.querySelectorAll(".gm-btn").forEach(b =>
+    b.classList.toggle("active", b.dataset.rmode === modo));
+  genTabs.classList.toggle("hidden", modo !== "gen");
+  dexTabs.classList.toggle("hidden", modo !== "dex");
+  pdexSyncGenTabs();
+  pdexSyncDexTabs();
+  pdexRenderProgress();
+  await applyFilters({ resetIndex: true });
 }
 
 function pdexBindControls() {
@@ -2335,6 +2479,8 @@ function pdexBindControls() {
     // Re-filter on both show and hide so the list never keeps a stale stat filter.
     applyFilters({ resetIndex: true });
   });
+  document.querySelectorAll(".gm-btn").forEach(b =>
+    b.addEventListener("click", () => pdexSetRegionMode(b.dataset.rmode)));
   $("chipView").addEventListener("click", pdexToggleView);
   $("chipHelp").addEventListener("click", pdexToggleHelp);
   $("chipData").addEventListener("click", () => {

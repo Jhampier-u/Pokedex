@@ -189,6 +189,37 @@ Verificado con `#/pokemon/448` → Lucario, `#/equipo/6,9,3` → los tres, y
 Las tarjetas muestran el apodo en grande y la especie debajo, y llevan a la
 ficha al hacer clic.
 
+## Tanda 13 — Filtro por Pokédex regional + LRU en la caché
+
+**Filtro por Pokédex regional.** En vez de añadir un tercer control junto a los
+tabs y al selector de REGLAS (que ya lió las cosas una vez), se resolvió con un
+**conmutador de criterio** sobre la misma fila de pestañas:
+
+```
+[Por generación] [Por Pokédex regional]
+```
+
+Cada criterio pinta sus propias pestañas. Así queda explícito que son dos ejes
+distintos en lugar de tres controles que parecen lo mismo.
+
+Las pertenencias son una consulta GraphQL (7212 filas, ~299 KB, 596 ms) que
+**solo se pide si entras en ese modo**, y queda en IndexedDB. La barra de
+progreso de capturados también se adapta a la dex activa.
+
+Verificado contra los tamaños que da la API: Kanto 151, Alola (US/UL) 403,
+Galar 400, Hisui 242. Y lo importante: la dex de Alola incluye **52 Pokémon de
+gen I**, que es justo lo que demuestra que no es lo mismo que el filtro por
+generación de origen.
+
+**LRU en `detailCache`.** Era la última deuda abierta del análisis inicial:
+cada objeto `/pokemon` trae la lista completa de movimientos y la caché en
+memoria crecía sin tope. Ahora está acotada a 300 entradas. IndexedDB sigue
+teniendo todo, así que recuperar algo desalojado no toca la red.
+
+Verificado: metiendo 500 entradas se queda en 300, el LRU no se desincroniza
+del objeto, las más viejas salen, reinsertar no duplica, y los objetos que ya
+estaban referenciados (equipo, duelo) siguen intactos aunque salgan de caché.
+
 ## Correcciones a lo que dije por el camino
 
 Tres cosas que reporté mal y conviene no repetir:

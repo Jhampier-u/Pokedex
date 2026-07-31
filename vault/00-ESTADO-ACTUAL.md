@@ -8,28 +8,29 @@
 | | |
 |---|---|
 | Rama | `main`, sincronizada con `origin/main` |
-| Último trabajo | Tracker Nuzlocke, fase 2 (`git log -1` para el hash) |
+| Último trabajo | Filtro por Pokédex regional y LRU en caché (`git log -1` para el hash) |
 | Árbol de trabajo | Limpio, todo pusheado |
 | Remoto | https://github.com/Jhampier-u/Pokedex |
 | Servidor local | `python -m http.server 5599` (ya está en `.claude/launch.json` como `pokedex-static`) |
 
 ## Qué se acaba de terminar
 
-**Nuzlocke fase 2**: zonas ordenadas por número de ruta en vez de
-alfabéticamente, panel de equipo activo con envío al constructor de equipo,
-cementerio, y la regla de bloquear la zona tras el encuentro.
+1. **Filtro por Pokédex regional**, como conmutador de criterio sobre la misma
+   fila de pestañas (`Por generación` / `Por Pokédex regional`), no como un
+   tercer control suelto.
+2. **LRU en `detailCache`** (300 entradas). Era la última deuda abierta del
+   análisis inicial.
 
 ## Qué toca ahora
 
-Nada empezado, y el backlog grande está agotado. Lo que queda en
-[`03-PENDIENTES.md`](03-PENDIENTES.md) son mejoras incrementales: detalles del
-Nuzlocke (línea temporal, más reglas), filtrar por Pokédex regional, y deuda
-menor (un LRU para `detailCache`, y decidir qué hacer con
-`Tareas Por Hacer.txt`).
+Nada empezado, y el backlog está prácticamente agotado. En
+[`03-PENDIENTES.md`](03-PENDIENTES.md) solo quedan detalles del Nuzlocke
+(línea temporal, más reglas, varios runs) y una decisión del usuario sobre
+`Tareas Por Hacer.txt`.
 
 Antes de nada, lee la corrección nº 0 de [`02-HISTORIAL.md`](02-HISTORIAL.md):
-las pestañas de región filtran por *generación de origen* y eso **es
-correcto**; no lo trates como un bug pendiente.
+las pestañas «Por generación» filtran por *generación de origen* y eso **es
+correcto**. El filtro «Por Pokédex regional» es el otro eje, y ya existe.
 
 ## Antes de tocar nada
 
