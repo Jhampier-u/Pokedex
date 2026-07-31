@@ -4,24 +4,25 @@ Ordenado por retorno respecto al esfuerzo. Nada de esto está empezado.
 
 ---
 
-## 1. Números de dex regional · esfuerzo medio · **arregla un bug**
+## 1. Filtrar por Pokédex regional · esfuerzo medio · opcional
 
-Ahora mismo la región se decide por **rango de ID** (`REGIONS` en la línea ~23),
-lo cual es incorrecto para formas regionales: un Vulpix de Alola es el ID 27 y
-cae en «Kanto».
+**Los números de dex regional ya están hechos** (se muestran en la ficha).
+Lo que queda, si se quiere, es poder **filtrar** por una Pokédex regional.
 
-La API tiene **35 pokédex regionales** en `/pokedex`, con la lista real de cada
-uno y el número de entrada dentro de esa región. `pokemon-species` también trae
-`pokedex_numbers` (Pikachu: `kanto:25`, `original-johto:22`, `hoenn:156`…).
+Sería un eje nuevo, no un sustituto de las pestañas de generación: las
+pestañas filtran por *generación de origen* y eso es correcto; una Pokédex
+regional incluye además Pokémon de generaciones anteriores. Por ejemplo,
+«Alola (US/UL)» tiene 403 entradas, muchas de gen I–VI.
 
-Esto permitiría:
-- Filtrar por región de verdad, con formas regionales donde toca.
-- Mostrar «#022 en Johto» además del número nacional.
-- Dexes que hoy no existen en la app: Isla de la Armadura, Tundra Corona,
-  Hisui, Kitakami, Disco Índigo.
+Daría acceso a dexes que hoy no se pueden filtrar de ninguna forma: Isla de la
+Armadura, Tundra Corona, Hisui, Kitakami, Área Azul.
 
-Ojo: cambiar `REGIONS` afecta al filtro, a los tabs, a la barra de progreso por
-región y a la ruleta. No es un cambio de una línea.
+Se puede sacar todo con una sola consulta GraphQL
+(`pokemon_v2_pokemondexnumber`) y cachearla como las demás.
+
+Ojo con la UI: ya hay pestañas de región y un selector de REGLAS, y añadir un
+tercer control parecido puede volver a liar las cosas (ya pasó una vez, ver
+`04-DECISIONES.md`).
 
 ---
 

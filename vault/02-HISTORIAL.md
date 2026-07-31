@@ -112,9 +112,30 @@ Verificado: las 4 modalidades pintan su pista, Mewtwo sale como «??? fue creado
 por manipulación genética…», el temporizador agotado suma total y pone la racha
 a 0, y un acierto revela el sprite y oculta la pista.
 
+## Tanda 9 — Números de dex regional
+
+La ficha muestra ahora en qué Pokédex regionales aparece cada Pokémon y con qué
+número. El dato ya venía dentro de `pokemon-species` (`pokedex_numbers`), así
+que **son 0 peticiones nuevas**.
+
+Se filtran la Nacional (redundante con el número grande) y las Pokédex de isla
+de Alola (Melemele, Akala, Ulaula, Poni), que son subdivisiones y solo añaden
+ruido.
+
+Verificado: Vulpix sale en 13 dexes incluidas las dos de Alola; Pikachu en 19
+con Kanto #025, Johto #022 y Hoenn #156; Ogerpon solo en Kitakami #200.
+
 ## Correcciones a lo que dije por el camino
 
-Dos cosas que reporté mal y conviene no repetir:
+Tres cosas que reporté mal y conviene no repetir:
+
+0. **«Las regiones por rango de ID son un bug: un Vulpix de Alola cae en
+   Kanto»** — falso, y estuvo escrito en el análisis y en el vault. Vulpix es
+   la especie 37 y es de `generation-i`, así que clasificarlo en Kanto es
+   **correcto**: las pestañas filtran por *generación de origen* y los IDs se
+   asignan justamente por generación. Que además tenga forma de Alola no
+   cambia su generación de origen. La Pokédex regional es un **eje distinto**,
+   no una corrección del existente. (De paso: la 27 es Sandshrew, no Vulpix.)
 
 1. **«108 selectores CSS duplicados»** — falso. Mi grep truncaba en el primer
    `:` o `.`, así que `.filter-chip`, `.filter-chip:hover` y `.filter-chip.on`

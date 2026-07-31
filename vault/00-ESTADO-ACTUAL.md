@@ -8,23 +8,29 @@
 | | |
 |---|---|
 | Rama | `main`, sincronizada con `origin/main` |
-| Último trabajo | Modalidades del quiz (`git log -1` para el hash) |
+| Último trabajo | Números de dex regional en la ficha (`git log -1` para el hash) |
 | Árbol de trabajo | Limpio, todo pusheado |
 | Remoto | https://github.com/Jhampier-u/Pokedex |
 | Servidor local | `python -m http.server 5599` (ya está en `.claude/launch.json` como `pokedex-static`) |
 
 ## Qué se acaba de terminar
 
-Las **modalidades del quiz**: además de la silueta, ahora se puede adivinar por
-grito, por entrada de Pokédex o por estadísticas, con un modo contrarreloj de
-10 segundos.
+Dos cosas seguidas:
+
+1. **Modalidades del quiz** — además de la silueta, se puede adivinar por
+   grito, por entrada de Pokédex o por estadísticas, con contrarreloj de 10 s.
+2. **Números de dex regional** en la ficha, con 0 peticiones nuevas porque el
+   dato ya venía en `pokemon-species`.
 
 ## Qué toca ahora
 
 Nada empezado. Lo siguiente por prioridad está en
-[`03-PENDIENTES.md`](03-PENDIENTES.md). El primero es el **dex regional**
-(`/pokedex`), que además arregla el bug de las formas regionales: hoy la región
-se decide por rango de ID y un Vulpix de Alola cae en «Kanto».
+[`03-PENDIENTES.md`](03-PENDIENTES.md). Los candidatos son el **tracker
+Nuzlocke** (el más ambicioso) y la **paleta de comandos Ctrl+K**.
+
+Antes de nada, lee la corrección nº 0 de [`02-HISTORIAL.md`](02-HISTORIAL.md):
+las pestañas de región filtran por *generación de origen* y eso **es
+correcto**; no lo trates como un bug pendiente.
 
 ## Antes de tocar nada
 

@@ -892,6 +892,9 @@ async function loadCenterDetail() {
         isLegendary:   sd.is_legendary,
         isMythical:    sd.is_mythical,
         isBaby:        sd.is_baby,
+        // Número de este Pokémon en cada Pokédex regional. Ya venía aquí.
+        dexNumbers:    (sd.pokedex_numbers || [])
+                         .map(x => ({ dex: x.pokedex.name, num: x.entry_number })),
       };
       state.speciesCache[cur.id] = species;
     }
@@ -956,6 +959,7 @@ function renderAll(data, species) {
   renderAbilities(data.abilities);
   renderStats(data.stats);
   renderBreeding(species);
+  renderDexNumbers(species);
   renderMoves(data);
   renderWeaknesses(types);
   renderVarieties(species.varieties || [], data.name);
@@ -1086,6 +1090,44 @@ function renderStats(stats) {
     });
   });
 }
+// ── Números de Pokédex regional ─────────────────────────
+// Ojo: esto NO es lo mismo que la región de las pestañas. Esas filtran por
+// generación de origen (Vulpix es de gen I, luego Kanto), mientras que aquí se
+// listan todas las Pokédex regionales donde aparece —Vulpix sale en 16, entre
+// ellas Alola, porque tiene forma regional—. Son dos ejes distintos.
+const DEX_LABELS = {
+  kanto:"Kanto", "letsgo-kanto":"Kanto (Let's Go)",
+  "original-johto":"Johto (O/P/C)", "updated-johto":"Johto (HG/SS)",
+  hoenn:"Hoenn (R/Z/E)", "updated-hoenn":"Hoenn (ROZA)",
+  "original-sinnoh":"Sinnoh (D/P)", "extended-sinnoh":"Sinnoh (Pt)",
+  "original-unova":"Teselia (N/B)", "updated-unova":"Teselia (N2/B2)",
+  "kalos-central":"Kalos Centro", "kalos-coastal":"Kalos Costa",
+  "kalos-mountain":"Kalos Montaña",
+  "original-alola":"Alola (S/L)", "updated-alola":"Alola (US/UL)",
+  galar:"Galar", "isle-of-armor":"Isla Armadura", "crown-tundra":"Tundra Corona",
+  hisui:"Hisui", paldea:"Paldea", kitakami:"Kitakami", blueberry:"Área Azul",
+  "conquest-gallery":"Conquest", "lumiose-city":"Ciudad Luminalia",
+  hyperspace:"Hiperespacio", champions:"Champions",
+};
+// Las Pokédex de isla de Alola son subdivisiones de las de Alola: sobran aquí.
+const DEX_SKIP = /^(national|original-|updated-)?(melemele|akala|ulaula|poni)$/;
+
+function renderDexNumbers(species) {
+  const host = $("dexNumbers");
+  if (!host) return;
+  const list = (species.dexNumbers || [])
+    .filter(d => d.dex !== "national" && !DEX_SKIP.test(d.dex));
+  if (list.length === 0) {
+    host.innerHTML = '<span class="moves-empty">Solo aparece en la Pokédex Nacional.</span>';
+    return;
+  }
+  host.innerHTML = list.map(d => `
+    <span class="dexnum">
+      <span class="dexnum-dex">${DEX_LABELS[d.dex] || prettyName(d.dex)}</span>
+      <span class="dexnum-val">#${padId(d.num)}</span>
+    </span>`).join("");
+}
+
 // ── Movimientos por juego y método de aprendizaje ───────
 // Esta información ya venía dentro de cada /pokemon (version_group_details) y
 // se estaba tirando: antes se mostraban los 16 primeros por orden alfabético.
