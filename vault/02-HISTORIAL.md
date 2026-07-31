@@ -326,6 +326,34 @@ y no a la API. Verificado que el reintento con red funciona sin recargar.
 dato ya estaba en IndexedDB de un test anterior. Hubo que buscar un juego sin
 cachear (Platino) para medir algo de verdad. Anotado en `05-VERIFICACION.md`.
 
+## Tanda 18 — Accesibilidad de teclado y auditoría de tablet
+
+La Tanda 6 añadió roles ARIA y trampas de foco, pero **nunca se recorrió la app
+con el teclado**. Al hacerlo salieron dos fallos que llevaban ahí desde
+entonces:
+
+**1. 28 elementos con clic inalcanzables por teclado.** `.move-tag` (16) y
+`.ability-tag` (3) eran `<span>`, y `.evo-poke` (9) un `<div>`, todos con
+manejador de clic y sin `tabindex`. Con teclado **no había forma** de abrir el
+detalle de un movimiento o una habilidad, ni de saltar por la cadena
+evolutiva. Ahora los dos primeros son `<button>` y el nodo de evolución lleva
+`role="button"`, `tabindex="0"`, `aria-label` y manejador de Enter/Espacio.
+
+Los `.stage-item` del carrusel se dejan fuera del orden de tabulación a
+propósito: su función (navegar) ya está cubierta por las flechas y la
+paginación, y meterían 5 paradas por render sin aportar nada.
+
+**2. No había ningún indicador de foco visible.** Cero reglas de
+`:focus-visible` y una decena de `outline: none`. Navegando con teclado no se
+veía dónde estabas. Añadido un contorno amarillo global, con blanco sobre los
+badges de tipo, donde el amarillo no contrasta.
+
+**Tablet (768px): limpio.** Solo el `.tdc-member` de 4px ya conocido.
+
+Nota honesta: la comprobación final del contorno se hizo por CSSOM y con un
+elemento de prueba, porque las pulsaciones reales de Tab no llegaban al panel
+de forma fiable. Una pulsación sí llegó y confirmó que la regla se activa.
+
 ## Correcciones a lo que dije por el camino
 
 Tres cosas que reporté mal y conviene no repetir:

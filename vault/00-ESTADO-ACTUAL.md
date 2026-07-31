@@ -8,29 +8,28 @@
 | | |
 |---|---|
 | Rama | `main`, sincronizada con `origin/main` |
-| Último trabajo | Auditoría del funcionamiento sin conexión (`git log -1` para el hash) |
+| Último trabajo | Accesibilidad de teclado y auditoría de tablet (`git log -1` para el hash) |
 | Árbol de trabajo | Limpio, todo pusheado |
 | Remoto | https://github.com/Jhampier-u/Pokedex |
 | Servidor local | `python -m http.server 5599` (ya está en `.claude/launch.json` como `pokedex-static`) |
 
 ## Qué se acaba de terminar
 
-**Auditoría offline.** Se había afirmado que la app funciona sin conexión sin
-haberlo comprobado nunca. Comprobado: catálogo, fichas visitadas, stats,
-naturalezas, tablas de tipos, Pokédex regionales y el shell salen todos de
-caché sin tocar la red.
+**Accesibilidad de teclado.** La Tanda 6 añadió roles ARIA pero nunca se
+recorrió la app con el teclado. Al hacerlo: 28 elementos con clic eran
+inalcanzables (movimientos, habilidades y cadena evolutiva) y **no había
+ningún indicador de foco visible**. Ambas cosas arregladas.
 
-De paso salió un bug: el Nuzlocke culpaba a la API («este juego no tiene
-encuentros registrados») de lo que era un problema de conexión.
+Tablet (768px) auditado: limpio.
 
 ## Qué toca ahora
 
-Nada empezado. El backlog está agotado y la app está auditada en móvil,
-escritorio y sin conexión.
+Nada empezado. La app está auditada en móvil, tablet, escritorio, sin conexión
+y con teclado.
 
-Si aparece algo nuevo, probablemente salga **usándola** o auditando algo que
-se dio por bueno sin comprobar. Las tres últimas tandas de bugs salieron así,
-no de las pruebas funcionales. Lee las trampas de
+Si aparece algo nuevo, lo más probable es que salga **usándola** o auditando
+algo que se dio por bueno. Cuatro tandas seguidas de bugs han salido así y
+ninguno de las pruebas funcionales. Lee las trampas de
 [`05-VERIFICACION.md`](05-VERIFICACION.md) antes de dar nada por verificado.
 
 ## Antes de tocar nada

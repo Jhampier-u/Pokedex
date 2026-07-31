@@ -152,6 +152,32 @@ conexión. El Nuzlocke decía «este juego no tiene encuentros registrados en la
 API» cuando lo que pasaba es que no había internet. Devuelve `null` en el
 fallo y `{}` en el vacío legítimo.
 
+### `el.focus()` no activa `:focus-visible`
+
+`:focus-visible` solo se activa con foco por teclado. Enfocar desde JS da
+`matches(':focus-visible') === false` y parece que la regla no funciona.
+
+Para probarlo hace falta una pulsación **real** de Tab (herramienta `computer`,
+acción `key`), y aun así no siempre llega si el panel no tiene el foco. Como
+alternativa determinista, comprueba por CSSOM que la regla existe con sus
+prioridades, y aplica las mismas declaraciones a un elemento de prueba:
+
+```js
+const p = document.createElement('button');
+p.className = 'move-tag';
+p.style.cssText = 'outline-color:#FFD700 !important; ...';
+document.body.appendChild(p);
+getComputedStyle(p).outlineColor;   // rgb(255, 215, 0)
+```
+
+### Evita `outline: Xpx solid var(--algo)` en atajos
+
+Con el atajo, el color acababa resolviéndose a `currentColor` y el
+`outline-offset` lo pisaban reglas previas, aunque el bloque sí entraba (se
+confirmó porque otras declaraciones del mismo bloque tampoco ganaban). Con
+longhands (`outline-style`, `outline-width`, `outline-color`, `outline-offset`)
+y color literal, cada una con `!important`, no hay ambigüedad.
+
 ### Cuidado con las métricas propias
 
 El «108 selectores CSS duplicados» que reporté era un artefacto de mi propio

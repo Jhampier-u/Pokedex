@@ -1103,7 +1103,10 @@ function renderAbilities(abilities) {
   const list = $("pokeAbilities");
   list.innerHTML = "";
   abilities.forEach(a => {
-    const s = document.createElement("span");
+    // <button> y no <span>: con span no había forma de abrir el detalle
+    // usando el teclado.
+    const s = document.createElement("button");
+    s.type = "button";
     s.className = "ability-tag" + (a.is_hidden ? " hidden-ability" : "");
     s.textContent = cap(a.ability.name.replace(/-/g, " "));
     s.dataset.name = a.ability.name;
@@ -1316,7 +1319,8 @@ function renderMovesetList(list) {
   }
   const frag = document.createDocumentFragment();
   list.forEach(mv => {
-    const s = document.createElement("span");
+    const s = document.createElement("button");
+    s.type = "button";
     s.className = "move-tag";
     s.dataset.name = mv.name;
     s.innerHTML = (moveset.method === "level-up" && mv.level > 0)
@@ -1425,6 +1429,12 @@ function buildEvolutionTree(node, currentId) {
   const poke = document.createElement("div");
   poke.className = "evo-poke" + (isCurrent ? " current" : "");
   poke.title = "Saltar a " + node.species.name;
+  // Se navega con clic, así que también tiene que poder hacerse con teclado
+  if (!isCurrent) {
+    poke.tabIndex = 0;
+    poke.setAttribute("role", "button");
+    poke.setAttribute("aria-label", "Ir a " + node.species.name);
+  }
   poke.innerHTML = `
     <img src="${spriteFor(id)}" alt="${node.species.name}" loading="lazy"
          onerror="this.style.opacity='0.2'"/>
@@ -1432,6 +1442,10 @@ function buildEvolutionTree(node, currentId) {
     <span class="evo-num">#${padId(id)}</span>`;
   poke.addEventListener("click", () => {
     if (!isCurrent) jumpToId(id);
+  });
+  poke.addEventListener("keydown", e => {
+    if (isCurrent) return;
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); jumpToId(id); }
   });
   wrapper.appendChild(poke);
 

@@ -3864,3 +3864,33 @@ body.retro-gen .pokedex-card { box-shadow: inset 0 0 0 2px rgba(255,215,0,0.18);
   .tr-tier-row { min-width: 0; }
   .tdc-members { min-width: 0; }
 }
+
+/* ══════════════════════════════════════
+   FOCO VISIBLE
+   No había ninguna regla de :focus-visible y sí una decena de "outline:none",
+   así que navegando con teclado no se veía dónde estabas. El !important es
+   deliberado: hay que ganarle a esos outline:none ya existentes.
+   Se usa :focus-visible y no :focus para que el ratón no deje el borde puesto.
+══════════════════════════════════════ */
+:focus-visible {
+  /* Longhands y color literal a proposito: con el atajo
+     "outline: 3px solid var(--yellow)" el color acababa resolviendose a
+     currentColor y el offset lo pisaban reglas previas. Asi no hay dudas. */
+  outline-style: solid  !important;
+  outline-width: 3px    !important;
+  outline-color: #FFD700 !important;
+  outline-offset: 2px   !important;
+}
+/* Sobre superficies claras (badges de tipo) el amarillo no contrasta */
+.type-badge:focus-visible, .quiz-opt:focus-visible {
+  outline-color: #FFFFFF !important;
+}
+
+/* .move-tag y .ability-tag pasaron de <span> a <button> para ser alcanzables
+   con teclado: hay que reponer lo que el navegador cambia en un botón. */
+.move-tag, .ability-tag {
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.evo-poke[role="button"] { cursor: pointer; }
