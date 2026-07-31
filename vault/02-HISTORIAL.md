@@ -408,6 +408,26 @@ Android. Se comprueba con el mismo script que detectó el problema.
 También: `sw.js` pasa a `VERSION v2` para invalidar la caché vieja, y se borró
 `Tareas Por Hacer.txt`, obsoleto desde que existen el README y el vault.
 
+## Tanda 20 — Sprites de época
+
+El modo generación ya cambiaba la tabla de tipos y el tipado; ahora **también
+cambia el sprite**. Con reglas de Gen I, Bulbasaur se ve como en Rojo/Azul.
+
+Un juego representativo por generación (`GEN_SPRITES`), con dos detalles que
+salieron de comprobar el repositorio en vez de suponer:
+
+- **Gen I no tiene carpeta shiny**, porque el variocolor no existía hasta Gen
+  II. Pedir shiny en Gen I devuelve el sprite normal, que es lo correcto.
+- **Gen VIII queda fuera a propósito**: el repositorio solo tiene iconos de
+  menú, diminutos, que quedarían borrosos en el carrusel.
+
+Cada generación lleva su `max` de Pokémon, así que un Pokémon posterior nunca
+pide un sprite que no existe: Lucario con reglas de Gen I muestra directamente
+el moderno, sin 404 ni parpadeo de respaldo.
+
+La ficha usa el sprite de época en vez del arte oficial (que solo existe en
+versión moderna) y vuelve al arte oficial al salir del modo.
+
 ## Correcciones a lo que dije por el camino
 
 Tres cosas que reporté mal y conviene no repetir:

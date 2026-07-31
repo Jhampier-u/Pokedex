@@ -281,8 +281,35 @@ const padId = id => String(id).padStart(3, "0");
 const getId = url => parseInt(url.split("/").filter(Boolean).pop(), 10);
 const clamp = (v, mn, mx) => Math.max(mn, Math.min(mx, v));
 
-function spriteFor(id, { shiny = false, animated = false } = {}) {
+// Sprites de la época: cada generación tenía su propio dibujo. El `max` evita
+// pedir imágenes que no existen (un Pokémon de gen V no tiene sprite de gen I),
+// así no hay 404 ni parpadeos de fallback.
+// Gen VIII se queda fuera a propósito: el repositorio solo tiene los iconos de
+// menú, que son diminutos y quedarían borrosos en el carrusel.
+const GEN_SPRITES = {
+  1: { path: "generation-i/red-blue",               max: 151, shiny: false },
+  2: { path: "generation-ii/crystal",               max: 251, shiny: true  },
+  3: { path: "generation-iii/emerald",              max: 386, shiny: true  },
+  4: { path: "generation-iv/platinum",              max: 493, shiny: true  },
+  5: { path: "generation-v/black-white",            max: 649, shiny: true  },
+  6: { path: "generation-vi/x-y",                   max: 721, shiny: true  },
+  7: { path: "generation-vii/ultra-sun-ultra-moon", max: 809, shiny: true  },
+};
+
+function spriteFor(id, { shiny = false, animated = false, gen = null } = {}) {
   const base = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon";
+
+  // Con reglas de otra generación, el sprite también cambia de época
+  const g = gen ?? state.gen;
+  if (!animated && g < CURRENT_GEN) {
+    const info = GEN_SPRITES[g];
+    if (info && id <= info.max) {
+      // En gen I no había variocolor: se muestra el normal, que es lo correcto
+      return shiny && info.shiny
+        ? `${base}/versions/${info.path}/shiny/${id}.png`
+        : `${base}/versions/${info.path}/${id}.png`;
+    }
+  }
   if (animated) {
     // Gen I-V tienen los GIF de Blanco/Negro. Para el resto tiramos de los
     // sprites de Showdown, que llegan casi hasta gen 9 — pero no están todos
@@ -305,7 +332,9 @@ function applySprite(img, id, opts = {}) {
   img.onerror = () => {
     if (img.dataset.fallback === "1") { img.onerror = null; return; }
     img.dataset.fallback = "1";
-    img.src = spriteFor(id, { shiny: opts.shiny });
+    // El respaldo siempre es el sprite moderno: si falla el de época, volver a
+    // pedir el mismo de época no arreglaría nada.
+    img.src = spriteFor(id, { shiny: opts.shiny, gen: CURRENT_GEN });
   };
   img.src = spriteFor(id, opts);
 }
@@ -623,7 +652,9 @@ function refreshSprites() {
   const cur = state.filtered[state.current];
   if (cur) {
     const img = $("pokemonSprite");
-    img.src = officialArtFor(cur.id, state.shinyMode);
+    const info = GEN_SPRITES[state.gen];
+    if (info && cur.id <= info.max) applySprite(img, cur.id, { shiny: state.shinyMode });
+    else { img.onerror = null; img.src = officialArtFor(cur.id, state.shinyMode); }
   }
 }
 function updatePagination() {
@@ -989,8 +1020,12 @@ function renderAll(data, species) {
   $("pokeName").textContent   = data.name.toUpperCase();
   $("pokeGenus").textContent  = species.genus || "Pokémon";
 
+  // En modo generación la ficha también enseña el sprite de la época; el arte
+  // oficial solo existe en versión moderna.
   const img = $("pokemonSprite");
-  img.src = officialArtFor(data.id, state.shinyMode);
+  const info = GEN_SPRITES[state.gen];
+  if (info && data.id <= info.max) applySprite(img, data.id, { shiny: state.shinyMode });
+  else { img.onerror = null; img.src = officialArtFor(data.id, state.shinyMode); }
   img.alt = data.name;
 
   $("pokeHeight").textContent = `${(data.height / 10).toFixed(1)} m`;
@@ -2538,6 +2573,7 @@ function pdexBindControls() {
     state.gen   = g;
     activeChart = chartForGeneration(g);
     document.body.classList.toggle("retro-gen", g < CURRENT_GEN);
+    refreshSprites();                         // el carrusel cambia al sprite de la época
     loadCenterDetail();                       // repinta la ficha con las nuevas reglas
     if (TOOL_INITED.team && teamState.members.length) renderTeamAnalysis();
     if (TOOL_INITED.duel && duelState.A && duelState.B) runBattle();

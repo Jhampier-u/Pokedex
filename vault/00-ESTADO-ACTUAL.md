@@ -8,7 +8,7 @@
 | | |
 |---|---|
 | Rama | `main`, sincronizada con `origin/main` |
-| Último trabajo | Iconos de la PWA regenerados (`git log -1` para el hash) |
+| Último trabajo | Sprites de época en el modo generación (`git log -1` para el hash) |
 | Árbol de trabajo | Limpio, todo pusheado |
 | Remoto | https://github.com/Jhampier-u/Pokedex |
 | Desplegado | https://jhampier-u.github.io/Pokedex/ (GitHub Pages, verificado) |
@@ -16,19 +16,16 @@
 
 ## Qué se acaba de terminar
 
-**Iconos de la PWA.** Al hacer el icono adaptativo se descubrió que el original
-no era transparente: tenía el tablero de cuadros pegado en la imagen. Se limpió
-y se generaron cuatro iconos (`any` y `maskable`, 192 y 512), con la zona
-segura **medida**. Borrado también `Tareas Por Hacer.txt`.
+**Sprites de época.** El modo generación ya cambiaba tabla de tipos y tipado;
+ahora también el sprite. Con reglas de Gen I, Bulbasaur se ve como en
+Rojo/Azul. Gen VIII queda fuera porque el repositorio solo tiene iconos de menú.
 
 ## Qué toca ahora
 
-Nada empezado. El backlog está agotado: la app está auditada en móvil, tablet,
-escritorio, sin conexión y con teclado, y el despliegue en GitHub Pages está
-verificado.
-
-Lo que queda en [`03-PENDIENTES.md`](03-PENDIENTES.md) son ideas opcionales que
-nadie echa de menos. Lo más útil es **usarla**.
+Nada empezado. Está en estudio si merece la pena una **sección de objetos**
+(ver la nota al final de [`03-PENDIENTES.md`](03-PENDIENTES.md)): la conclusión
+provisional es que un catálogo de 2180 objetos no compensa, pero sí las
+conexiones con lo que ya existe.
 
 ## Antes de tocar nada
 
