@@ -2676,6 +2676,37 @@ kbd {
 .nz-val   { font-family: nintendo-DS; font-size: 20px; color: var(--yellow); }
 .nz-val.nz-dead { color: #FF6666; }
 
+.nuz-run-btns { display: flex; gap: 5px; align-items: flex-end; }
+.nz-mini {
+  font-family: nintendo-DS; font-size: 14px;
+  background: #161616; border: 2px solid #383838; border-radius: 4px;
+  color: rgba(255,248,231,0.7); padding: 8px 11px; cursor: pointer; line-height: 1;
+}
+.nz-mini:hover:not(:disabled) { border-color: var(--yellow); color: var(--yellow); }
+.nz-mini:disabled { opacity: 0.3; cursor: not-allowed; }
+.nz-mini.nz-danger:hover:not(:disabled) { border-color: #FF6666; color: #FF8888; }
+
+.nuz-timeline {
+  background: #0d0d0d; border: 2px solid #262626; border-radius: 6px;
+  padding: 12px 14px; margin-bottom: 18px;
+}
+.nz-log { display: flex; flex-direction: column; gap: 3px; max-height: 300px; overflow-y: auto; }
+.nz-log-row {
+  display: grid; grid-template-columns: 20px 30px 1fr auto;
+  align-items: center; gap: 9px;
+  padding: 4px 6px; border-radius: 4px;
+}
+.nz-log-row:nth-child(odd) { background: rgba(255,255,255,0.02); }
+.nz-log-icon { text-align: center; font-size: 13px; }
+.nz-log-row img { width: 28px; height: 28px; image-rendering: pixelated; }
+.nz-log-gap { display: block; }
+.nz-log-txt { font-size: 13px; color: rgba(255,248,231,0.7); }
+.nz-log-txt b { color: var(--yellow); }
+.nz-log-time {
+  font-family: nintendo-DS; font-size: 10px;
+  color: rgba(255,248,231,0.3); letter-spacing: 0.5px; white-space: nowrap;
+}
+
 .nuz-panels { display: flex; flex-direction: column; gap: 12px; margin-bottom: 18px; }
 .nuz-panel {
   background: #0d0d0d; border: 2px solid #262626; border-radius: 6px; padding: 12px 14px;

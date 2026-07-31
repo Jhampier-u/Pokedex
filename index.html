@@ -587,6 +587,14 @@
           <p class="tool-subtitle">Un encuentro por ruta, y lo que cae, cae</p>
 
           <div class="nuz-config">
+            <label class="nuz-field">RUN
+              <select id="nuzRun" class="dcfg-sel"></select>
+            </label>
+            <div class="nuz-run-btns">
+              <button class="nz-mini" id="nuzNew"    title="Crear un run nuevo">＋</button>
+              <button class="nz-mini" id="nuzRename" title="Renombrar este run">✎</button>
+              <button class="nz-mini nz-danger" id="nuzDelete" title="Borrar este run">🗑</button>
+            </div>
             <label class="nuz-field">JUEGO
               <select id="nuzVersion" class="dcfg-sel"></select>
             </label>
@@ -604,13 +612,14 @@
               <input type="checkbox" id="nuzLock"/>
               <span>Bloquear tras el encuentro</span>
             </label>
-            <button class="nuz-reset" id="nuzReset">⌫ Reiniciar run</button>
+            <button class="nuz-reset" id="nuzReset">⌫ Vaciar run</button>
           </div>
 
           <div class="nuz-summary" id="nuzSummary"></div>
           <div class="nuz-panels" id="nuzPanels"></div>
+          <div class="nuz-timeline hidden" id="nuzTimeline"></div>
           <div class="nuz-routes" id="nuzRoutes">
-            <p class="nuz-loading">Elige un juego para empezar.</p>
+            <p class="nuz-loading">Crea un run con ＋ y elige el juego.</p>
           </div>
         </div>
       </section>

@@ -2703,7 +2703,8 @@ function buildExport() {
 // El run de Nuzlocke puede no estar inicializado todavía; se lee de disco
 function nuzlockeExport() {
   if (TOOL_INITED.nuzlocke) {
-    return { runs: nuzState.runs, version: nuzState.version, rules: nuzState.rules };
+    return { runs: nuzState.runs, activeId: nuzState.activeId,
+             rules: nuzState.rules, sort: nuzState.sort };
   }
   try { return JSON.parse(localStorage.getItem("pokenuz") || "null"); } catch { return null; }
 }
@@ -2754,15 +2755,14 @@ async function importData(file) {
   if (json.nuzlocke && typeof json.nuzlocke === "object") {
     const nz = json.nuzlocke;
     if (nz.runs && typeof nz.runs === "object") {
-      nuzState.runs    = nz.runs;
-      nuzState.version = typeof nz.version === "string" ? nz.version : "";
-      if (nz.rules) nuzState.rules = nz.rules;
+      // Pasa por la misma migración que la carga: acepta el formato viejo
+      const { runs, activeId } = nuzMigrate(nz);
+      nuzState.runs     = runs;
+      nuzState.activeId = runs[activeId] ? activeId : (Object.keys(runs)[0] || "");
+      if (nz.rules) nuzState.rules = { ...nuzState.rules, ...nz.rules };
+      if (nz.sort)  nuzState.sort  = nz.sort;
       nuzSave();
-      if (TOOL_INITED.nuzlocke) {
-        const vs = $("nuzVersion");
-        if (vs && nuzState.version) vs.value = nuzState.version;
-        nuzRender();
-      }
+      if (TOOL_INITED.nuzlocke) { nuzRefreshRunSelect(); nuzRender(); }
     }
   }
 
@@ -2789,30 +2789,77 @@ const NUZ_STATUS = {
 };
 
 const nuzState = {
-  version: "",
-  sort:    "routes",
-  rules:   { dupes: true, lock: false },
-  runs:    {},     // { version: { zona: {id, nick, status} } }
-  pools:   {},     // { version: { zona: [ids] } }
+  runs:     {},    // { runId: {id, name, version, created, zones:{zona:{id,nick,status}}, log:[]} }
+  activeId: "",
+  sort:     "routes",
+  rules:    { dupes: true, lock: false },
+  pools:    {},    // { version: { zona: [ids] } }
   versions: [],
 };
+
+// El primer formato guardaba un solo run por juego: { runs: { red: {zona:...} } }.
+// Se migra a runs con identificador propio para poder tener varios del mismo juego.
+function nuzMigrate(raw) {
+  const runs = {};
+  const esViejo = raw.runs && Object.values(raw.runs).some(v =>
+    v && typeof v === "object" && !("zones" in v) &&
+    Object.values(v).some(e => e && typeof e === "object" && "status" in e));
+  if (esViejo) {
+    Object.entries(raw.runs).forEach(([version, zones]) => {
+      const id = "run-" + version;
+      runs[id] = { id, name: `Run de ${prettyVersion(version)}`, version,
+                   created: Date.now(), zones: zones || {}, log: [] };
+    });
+    return { runs, activeId: raw.version ? "run-" + raw.version : Object.keys(runs)[0] || "" };
+  }
+  Object.entries(raw.runs || {}).forEach(([id, r]) => {
+    if (r && typeof r === "object") {
+      runs[id] = { id, name: r.name || "Run", version: r.version || "",
+                   created: r.created || Date.now(), zones: r.zones || {}, log: r.log || [] };
+    }
+  });
+  return { runs, activeId: raw.activeId || Object.keys(runs)[0] || "" };
+}
 
 function nuzLoad() {
   try {
     const raw = JSON.parse(localStorage.getItem("pokenuz") || "{}");
-    nuzState.runs    = raw.runs    || {};
-    nuzState.version = raw.version || "";
-    nuzState.sort    = raw.sort    || "routes";
+    const { runs, activeId } = nuzMigrate(raw);
+    nuzState.runs     = runs;
+    nuzState.activeId = runs[activeId] ? activeId : (Object.keys(runs)[0] || "");
+    nuzState.sort     = raw.sort || "routes";
     if (raw.rules) nuzState.rules = { ...nuzState.rules, ...raw.rules };
   } catch {}
 }
 function nuzSave() {
   try {
     localStorage.setItem("pokenuz", JSON.stringify({
-      runs: nuzState.runs, version: nuzState.version,
+      runs: nuzState.runs, activeId: nuzState.activeId,
       rules: nuzState.rules, sort: nuzState.sort,
     }));
   } catch {}
+}
+
+const nuzActive  = () => nuzState.runs[nuzState.activeId] || null;
+const nuzVersion = () => nuzActive()?.version || "";
+
+function nuzNewRun(version, name) {
+  const id = "run-" + Date.now().toString(36) + "-" + Math.floor(Math.random() * 1e4);
+  nuzState.runs[id] = { id, name: name || "Run nuevo", version: version || "",
+                        created: Date.now(), zones: {}, log: [] };
+  nuzState.activeId = id;
+  nuzSave();
+  return nuzState.runs[id];
+}
+
+// Bitácora del run: qué pasó y cuándo
+function nuzLog(type, zona, entry) {
+  const r = nuzActive();
+  if (!r) return;
+  r.log = r.log || [];
+  r.log.push({ t: Date.now(), type, zona,
+               id: entry?.id ?? null, nick: entry?.nick || "" });
+  if (r.log.length > 400) r.log = r.log.slice(-400);
 }
 
 // La API no publica el orden en que visitas las zonas: el game_index solo
@@ -2825,7 +2872,7 @@ function nuzSortZones(zonas) {
   const otras = zonas.filter(z => num(z) === null).sort();
   return [...rutas, ...otras];
 }
-const nuzRun = () => (nuzState.runs[nuzState.version] ||= {});
+const nuzRun = () => (nuzActive()?.zones ?? {});
 
 // Versiones que tienen encuentros registrados (no todas los tienen)
 async function nuzEnsureVersions() {
@@ -2913,12 +2960,51 @@ async function initNuzlocke() {
   }
   sel.innerHTML = '<option value="">— Elige juego —</option>' +
     versions.map(v => `<option value="${v}">${prettyVersion(v)}</option>`).join("");
-  if (nuzState.version && versions.includes(nuzState.version)) sel.value = nuzState.version;
 
   sel.addEventListener("change", async () => {
-    nuzState.version = sel.value;
+    const r = nuzActive();
+    if (!r) { nuzNewRun(sel.value, `Run de ${prettyVersion(sel.value)}`); }
+    else {
+      const tieneDatos = Object.keys(r.zones).length > 0;
+      if (tieneDatos && !confirm(
+        `Cambiar de juego vacía las zonas de «${r.name}», porque son de otro juego. ¿Seguir?`)) {
+        sel.value = r.version;
+        return;
+      }
+      r.version = sel.value;
+      r.zones = {};
+      r.log = [];
+    }
     nuzSave();
+    nuzRefreshRunSelect();
     await nuzRender();
+  });
+
+  // ── Gestor de runs ──
+  $("nuzNew").addEventListener("click", async () => {
+    const nombre = prompt("Nombre del run nuevo:", "Nuzlocke " + (Object.keys(nuzState.runs).length + 1));
+    if (nombre === null) return;
+    nuzNewRun(sel.value || "", nombre.trim() || "Run nuevo");
+    nuzRefreshRunSelect();
+    await nuzRender();
+  });
+  $("nuzRename").addEventListener("click", () => {
+    const r = nuzActive(); if (!r) return;
+    const nombre = prompt("Nuevo nombre:", r.name);
+    if (nombre === null) return;
+    r.name = nombre.trim() || r.name;
+    nuzSave(); nuzRefreshRunSelect();
+  });
+  $("nuzDelete").addEventListener("click", async () => {
+    const r = nuzActive(); if (!r) return;
+    if (!confirm(`¿Borrar el run «${r.name}» entero? No se puede deshacer.`)) return;
+    delete nuzState.runs[r.id];
+    nuzState.activeId = Object.keys(nuzState.runs)[0] || "";
+    nuzSave(); nuzRefreshRunSelect(); await nuzRender();
+  });
+  $("nuzRun").addEventListener("change", async e => {
+    nuzState.activeId = e.target.value;
+    nuzSave(); nuzRefreshRunSelect(); await nuzRender();
   });
   $("nuzDupes").addEventListener("change", e => {
     nuzState.rules.dupes = e.target.checked;
@@ -2933,13 +3019,73 @@ async function initNuzlocke() {
     nuzSave(); nuzRender();
   });
   $("nuzReset").addEventListener("click", () => {
-    if (!nuzState.version) return;
-    if (!confirm(`¿Borrar todo el run de ${prettyVersion(nuzState.version)}? No se puede deshacer.`)) return;
-    delete nuzState.runs[nuzState.version];
+    const r = nuzActive(); if (!r) return;
+    if (!confirm(`¿Vaciar las zonas de «${r.name}»? El run se conserva, pero pierdes lo capturado.`)) return;
+    r.zones = {}; r.log = [];
     nuzSave(); nuzRender();
   });
 
-  if (nuzState.version) await nuzRender();
+  nuzRefreshRunSelect();
+  if (nuzVersion()) await nuzRender();
+}
+
+function nuzRefreshRunSelect() {
+  const sel = $("nuzRun");
+  const runs = Object.values(nuzState.runs)
+    .sort((a, b) => (b.created || 0) - (a.created || 0));
+  if (runs.length === 0) {
+    sel.innerHTML = '<option value="">— sin runs —</option>';
+  } else {
+    sel.innerHTML = runs.map(r =>
+      `<option value="${r.id}">${r.name}${r.version ? ` · ${prettyVersion(r.version)}` : ""}</option>`).join("");
+    sel.value = nuzState.activeId;
+  }
+  const vs = $("nuzVersion");
+  if (vs) vs.value = nuzVersion();
+  ["nuzRename", "nuzDelete", "nuzReset"].forEach(id => {
+    const b = $(id); if (b) b.disabled = runs.length === 0;
+  });
+}
+
+// ── Línea temporal del run ───────────────────────────────
+const NUZ_LOG_TEXT = {
+  catch: { icon: "🎯", txt: "capturado en" },
+  team:  { icon: "🎽", txt: "pasa al equipo desde" },
+  box:   { icon: "📦", txt: "va a la caja desde" },
+  dead:  { icon: "💀", txt: "cae en" },
+  miss:  { icon: "✖",  txt: "sin encuentro en" },
+  clear: { icon: "↺",  txt: "zona reiniciada:" },
+};
+function nuzTiempoRelativo(t) {
+  const s = Math.max(0, Math.floor((Date.now() - t) / 1000));
+  if (s < 60)    return "hace un momento";
+  if (s < 3600)  return `hace ${Math.floor(s / 60)} min`;
+  if (s < 86400) return `hace ${Math.floor(s / 3600)} h`;
+  return `hace ${Math.floor(s / 86400)} d`;
+}
+function nuzRenderTimeline() {
+  const host = $("nuzTimeline");
+  if (!host) return;
+  const r = nuzActive();
+  const log = (r?.log || []).slice(-40).reverse();
+  if (log.length === 0) { host.classList.add("hidden"); host.innerHTML = ""; return; }
+  host.classList.remove("hidden");
+  host.innerHTML = `
+    <div class="nz-panel-head"><span>🕘 LÍNEA TEMPORAL</span></div>
+    <div class="nz-log">
+      ${log.map(e => {
+        const m = NUZ_LOG_TEXT[e.type] || { icon: "•", txt: e.type };
+        const p = e.id ? state.allPokemon.find(x => x.id === e.id) : null;
+        const quien = e.nick || (p ? cap(p.name) : "");
+        return `
+          <div class="nz-log-row">
+            <span class="nz-log-icon">${m.icon}</span>
+            ${e.id ? `<img src="${spriteFor(e.id)}" alt="" loading="lazy"/>` : '<span class="nz-log-gap"></span>'}
+            <span class="nz-log-txt">${quien ? `<b>${quien}</b> ` : ""}${m.txt} ${prettyName(e.zona)}</span>
+            <span class="nz-log-time">${nuzTiempoRelativo(e.t)}</span>
+          </div>`;
+      }).join("")}
+    </div>`;
 }
 
 // Especies ya usadas, para la cláusula de duplicados
@@ -2954,13 +3100,18 @@ function nuzUsedSpecies(exceptZone) {
 
 async function nuzRender() {
   const host = $("nuzRoutes");
-  if (!nuzState.version) {
-    host.innerHTML = '<p class="nuz-loading">Elige un juego para empezar.</p>';
+  if (!nuzActive() || !nuzVersion()) {
+    host.innerHTML = `<p class="nuz-loading">${
+      Object.keys(nuzState.runs).length === 0
+        ? "Crea un run con ＋ y elige el juego."
+        : "Elige un juego para este run."}</p>`;
     $("nuzSummary").innerHTML = "";
+    $("nuzPanels").innerHTML = "";
+    $("nuzTimeline").classList.add("hidden");
     return;
   }
   host.innerHTML = '<p class="nuz-loading">Cargando zonas del juego…</p>';
-  const pool = await nuzEnsurePool(nuzState.version);
+  const pool = await nuzEnsurePool(nuzVersion());
   const zonas = Object.keys(pool);
   if (zonas.length === 0) {
     host.innerHTML = '<p class="nuz-loading">Este juego no tiene encuentros registrados en la API.</p>';
@@ -2971,6 +3122,7 @@ async function nuzRender() {
   const run = nuzRun();
   nuzRenderSummary(zonas, run);
   nuzRenderPanels(run);
+  nuzRenderTimeline();
 
   host.innerHTML = "";
   const frag = document.createDocumentFragment();
@@ -3124,8 +3276,8 @@ function nuzRenderRow(zona, especies, entry) {
       nuzSave();
     });
     row.querySelector(".nz-status").addEventListener("change", e => {
-      nuzRun()[zona].status = e.target.value;
-      nuzSave(); nuzRender();
+      // Vía nuzSet para que el cambio quede en la línea temporal
+      nuzSet(zona, { ...nuzRun()[zona], status: e.target.value });
     });
     const undo = row.querySelector(".nz-clear");
     if (undo) undo.addEventListener("click", () => nuzSet(zona, null));
@@ -3166,8 +3318,21 @@ function nuzRenderRow(zona, especies, entry) {
 }
 
 function nuzSet(zona, entry) {
-  const run = nuzRun();
-  if (entry === null) delete run[zona]; else run[zona] = entry;
+  const r = nuzActive();
+  if (!r) return;
+  if (entry === null) {
+    delete r.zones[zona];
+    nuzLog("clear", zona, null);
+  } else {
+    const prev = r.zones[zona];
+    r.zones[zona] = entry;
+    // Solo se anota lo que cambia de verdad, no cada tecla del apodo
+    if (!prev || prev.id !== entry.id) {
+      nuzLog(entry.status === "missed" ? "miss" : "catch", zona, entry);
+    } else if (prev.status !== entry.status) {
+      nuzLog(entry.status, zona, entry);
+    }
+  }
   nuzSave();
   nuzRender();
 }

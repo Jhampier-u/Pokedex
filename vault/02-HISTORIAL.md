@@ -220,6 +220,32 @@ Verificado: metiendo 500 entradas se queda en 300, el LRU no se desincroniza
 del objeto, las más viejas salen, reinsertar no duplica, y los objetos que ya
 estaban referenciados (equipo, duelo) siguen intactos aunque salgan de caché.
 
+## Tanda 14 — Nuzlocke: varios runs y línea temporal
+
+**Varios runs guardados.** Antes había uno por juego y punto. Ahora cada run
+tiene identificador, nombre y juego propios, así que caben varios del mismo
+juego (un run normal y uno monotipo, por ejemplo). Selector arriba con botones
+de crear, renombrar y borrar.
+
+El formato antiguo (`runs: { red: {zona: entry} }`) **se migra solo** al
+cargar, conservando zonas, apodos y estados. La misma migración se aplica al
+importar un JSON, así que un export viejo sigue valiendo.
+
+**Línea temporal.** Cada run lleva su bitácora: capturas, pases a caja,
+muertes, zonas falladas y reinicios, con sprite, apodo y tiempo relativo
+(«hace 5 min»). Se muestra en orden inverso y se limita a 400 entradas.
+
+Un fallo que salió probando: cambiar el estado desde el desplegable mutaba el
+objeto directamente sin pasar por `nuzSet`, así que las muertes **no se
+registraban** en la bitácora. Ahora todo pasa por `nuzSet`, que es quien
+decide qué anotar (el apodo no, para no llenar el log con cada tecla).
+
+Verificado: migración del formato viejo con datos intactos, dos runs
+independientes del mismo juego, los cuatro tipos de evento en la bitácora
+(«Pidgey capturado en Kanto Route 1», «Pidgey cae en Kanto Route 1»…),
+export/import de ida y vuelta con log incluido, y renombrar/borrar dejando los
+botones deshabilitados cuando no queda ninguno.
+
 ## Correcciones a lo que dije por el camino
 
 Tres cosas que reporté mal y conviene no repetir:

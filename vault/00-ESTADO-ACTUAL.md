@@ -8,25 +8,26 @@
 | | |
 |---|---|
 | Rama | `main`, sincronizada con `origin/main` |
-| Último trabajo | Filtro por Pokédex regional y LRU en caché (`git log -1` para el hash) |
+| Último trabajo | Nuzlocke: varios runs y línea temporal (`git log -1` para el hash) |
 | Árbol de trabajo | Limpio, todo pusheado |
 | Remoto | https://github.com/Jhampier-u/Pokedex |
 | Servidor local | `python -m http.server 5599` (ya está en `.claude/launch.json` como `pokedex-static`) |
 
 ## Qué se acaba de terminar
 
-1. **Filtro por Pokédex regional**, como conmutador de criterio sobre la misma
-   fila de pestañas (`Por generación` / `Por Pokédex regional`), no como un
-   tercer control suelto.
-2. **LRU en `detailCache`** (300 entradas). Era la última deuda abierta del
-   análisis inicial.
+**Nuzlocke: varios runs guardados y línea temporal.** Cada run tiene nombre y
+juego propios (caben varios del mismo juego), con migración automática del
+formato antiguo. Y cada run lleva su bitácora de capturas, muertes y fallos.
 
 ## Qué toca ahora
 
-Nada empezado, y el backlog está prácticamente agotado. En
-[`03-PENDIENTES.md`](03-PENDIENTES.md) solo quedan detalles del Nuzlocke
-(línea temporal, más reglas, varios runs) y una decisión del usuario sobre
+**El backlog está agotado.** En [`03-PENDIENTES.md`](03-PENDIENTES.md) solo
+quedan ideas opcionales (más reglas de Nuzlocke, orden de visita real de las
+zonas —que exigiría listas a mano—) y una decisión del usuario sobre
 `Tareas Por Hacer.txt`.
+
+Lo más útil ahora es **usar la app**: se ha verificado todo por consola, pero
+el diseño en móvil y la comodidad de uso solo se juzgan usándola.
 
 Antes de nada, lee la corrección nº 0 de [`02-HISTORIAL.md`](02-HISTORIAL.md):
 las pestañas «Por generación» filtran por *generación de origen* y eso **es

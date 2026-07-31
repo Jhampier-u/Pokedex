@@ -12,9 +12,7 @@ Fases 1 y 2 hechas. Ideas que quedaron fuera:
   que es una aproximación honesta. El orden real de visita no está en la API
   (el `game_index` solo cubre 49 de 93 zonas de Kanto y solo en gen IV), así
   que haría falta una lista escrita a mano por región. Valorar si compensa.
-- **Línea temporal** del run: qué cayó y cuándo, con marcas de tiempo.
 - **Más reglas**: nivel máximo por medalla, modo «solo un tipo».
-- **Nombre del run** y varios runs guardados por juego.
 
 ---
 
