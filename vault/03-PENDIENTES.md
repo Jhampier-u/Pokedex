@@ -26,20 +26,17 @@ tercer control parecido puede volver a liar las cosas (ya pasó una vez, ver
 
 ---
 
-## 2. Nuzlocke: fase 2 · esfuerzo medio
+## 2. Nuzlocke: lo que aún falta · esfuerzo bajo-medio
 
-La fase 1 ya está (modo propio, encuentros reales, apodos, estados, reglas,
-persistencia y export/import). Lo que se podría añadir:
+Fases 1 y 2 hechas. Ideas que quedaron fuera:
 
-- **Orden de juego** de las zonas. Ahora salen alfabéticas; lo suyo sería el
-  orden en que las visitas. La API no da ese orden, habría que derivarlo del
-  número de ruta o mantener una lista por región.
-- **Más reglas**: solo el primer encuentro (bloquear el dado tras fallar),
-  nivel máximo por medalla, modo «solo un tipo».
-- **Equipo activo** con los 6 en estado `team`, enlazando al constructor de
-  equipo para ver su cobertura.
-- **Línea temporal** del run: qué cayó y cuándo.
-- **Cementerio** como vista aparte.
+- **Orden de visita real.** Ahora las rutas van por número y el resto detrás,
+  que es una aproximación honesta. El orden real de visita no está en la API
+  (el `game_index` solo cubre 49 de 93 zonas de Kanto y solo en gen IV), así
+  que haría falta una lista escrita a mano por región. Valorar si compensa.
+- **Línea temporal** del run: qué cayó y cuándo, con marcas de tiempo.
+- **Más reglas**: nivel máximo por medalla, modo «solo un tipo».
+- **Nombre del run** y varios runs guardados por juego.
 
 ---
 

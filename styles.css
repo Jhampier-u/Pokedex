@@ -2676,6 +2676,43 @@ kbd {
 .nz-val   { font-family: nintendo-DS; font-size: 20px; color: var(--yellow); }
 .nz-val.nz-dead { color: #FF6666; }
 
+.nuz-panels { display: flex; flex-direction: column; gap: 12px; margin-bottom: 18px; }
+.nuz-panel {
+  background: #0d0d0d; border: 2px solid #262626; border-radius: 6px; padding: 12px 14px;
+}
+.nuz-panel.nz-grave { border-color: #3a1f1f; }
+.nz-panel-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  font-family: nintendo-DS; font-size: 12px;
+  color: rgba(255,248,231,0.55); letter-spacing: 2px; margin-bottom: 10px;
+}
+.nz-grave .nz-panel-head { color: #FF8888; }
+.nz-send {
+  font-family: nintendo-DS; font-size: 11px;
+  background: #161616; border: 2px solid #383838; border-radius: 4px;
+  color: var(--cream); padding: 6px 11px; letter-spacing: 1px; cursor: pointer;
+}
+.nz-send:hover { border-color: var(--yellow); color: var(--yellow); }
+.nz-cards { display: flex; flex-wrap: wrap; gap: 8px; }
+.nz-card {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  background: #111; border: 2px solid #2a2a2a; border-radius: 5px;
+  padding: 8px 10px; cursor: pointer; min-width: 92px;
+}
+.nz-card:hover { border-color: var(--yellow); }
+.nz-card img { width: 46px; height: 46px; image-rendering: pixelated; }
+.nz-grave .nz-card img { filter: grayscale(1) brightness(0.65); }
+.nz-card-nick {
+  font-family: nintendo-DS; font-size: 12px; color: var(--yellow);
+  letter-spacing: 0.5px; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.nz-card-sp   { font-size: 10px; color: rgba(255,248,231,0.45); text-transform: capitalize; }
+.nz-card-zone { font-size: 9px; color: rgba(255,248,231,0.3); letter-spacing: 0.5px; }
+.nz-locked {
+  font-family: nintendo-DS; font-size: 12px;
+  color: rgba(255,248,231,0.35); letter-spacing: 1px; padding: 0 6px;
+}
+
 .nuz-routes { display: flex; flex-direction: column; gap: 8px; }
 .nuz-loading {
   text-align: center; padding: 40px 20px;

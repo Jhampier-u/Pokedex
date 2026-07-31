@@ -590,14 +590,25 @@
             <label class="nuz-field">JUEGO
               <select id="nuzVersion" class="dcfg-sel"></select>
             </label>
+            <label class="nuz-field">ORDEN
+              <select id="nuzSort" class="dcfg-sel">
+                <option value="routes">Rutas primero</option>
+                <option value="alpha">Alfabético</option>
+              </select>
+            </label>
             <label class="nuz-check">
               <input type="checkbox" id="nuzDupes" checked/>
               <span>Cláusula de duplicados</span>
+            </label>
+            <label class="nuz-check">
+              <input type="checkbox" id="nuzLock"/>
+              <span>Bloquear tras el encuentro</span>
             </label>
             <button class="nuz-reset" id="nuzReset">⌫ Reiniciar run</button>
           </div>
 
           <div class="nuz-summary" id="nuzSummary"></div>
+          <div class="nuz-panels" id="nuzPanels"></div>
           <div class="nuz-routes" id="nuzRoutes">
             <p class="nuz-loading">Elige un juego para empezar.</p>
           </div>

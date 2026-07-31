@@ -2644,7 +2644,8 @@ const NUZ_STATUS = {
 
 const nuzState = {
   version: "",
-  rules:   { dupes: true },
+  sort:    "routes",
+  rules:   { dupes: true, lock: false },
   runs:    {},     // { version: { zona: {id, nick, status} } }
   pools:   {},     // { version: { zona: [ids] } }
   versions: [],
@@ -2655,15 +2656,28 @@ function nuzLoad() {
     const raw = JSON.parse(localStorage.getItem("pokenuz") || "{}");
     nuzState.runs    = raw.runs    || {};
     nuzState.version = raw.version || "";
-    if (raw.rules) nuzState.rules = raw.rules;
+    nuzState.sort    = raw.sort    || "routes";
+    if (raw.rules) nuzState.rules = { ...nuzState.rules, ...raw.rules };
   } catch {}
 }
 function nuzSave() {
   try {
     localStorage.setItem("pokenuz", JSON.stringify({
-      runs: nuzState.runs, version: nuzState.version, rules: nuzState.rules,
+      runs: nuzState.runs, version: nuzState.version,
+      rules: nuzState.rules, sort: nuzState.sort,
     }));
   } catch {}
+}
+
+// La API no publica el orden en que visitas las zonas: el game_index solo
+// existe para 49 de 93 sitios de Kanto y solo en gen IV. Así que ordenamos las
+// rutas por su número (que sí es progresión aproximada) y el resto detrás.
+function nuzSortZones(zonas) {
+  if (nuzState.sort === "alpha") return [...zonas].sort();
+  const num = z => { const m = z.match(/route-(\d+)/); return m ? parseInt(m[1], 10) : null; };
+  const rutas = zonas.filter(z => num(z) !== null).sort((a, b) => num(a) - num(b));
+  const otras = zonas.filter(z => num(z) === null).sort();
+  return [...rutas, ...otras];
 }
 const nuzRun = () => (nuzState.runs[nuzState.version] ||= {});
 
@@ -2741,6 +2755,8 @@ async function initNuzlocke() {
   TOOL_INITED.nuzlocke = true;
   nuzLoad();
   $("nuzDupes").checked = nuzState.rules.dupes !== false;
+  $("nuzLock").checked  = !!nuzState.rules.lock;
+  $("nuzSort").value    = nuzState.sort;
 
   const versions = await nuzEnsureVersions();
   const sel = $("nuzVersion");
@@ -2760,6 +2776,14 @@ async function initNuzlocke() {
   });
   $("nuzDupes").addEventListener("change", e => {
     nuzState.rules.dupes = e.target.checked;
+    nuzSave(); nuzRender();
+  });
+  $("nuzLock").addEventListener("change", e => {
+    nuzState.rules.lock = e.target.checked;
+    nuzSave(); nuzRender();
+  });
+  $("nuzSort").addEventListener("change", e => {
+    nuzState.sort = e.target.value;
     nuzSave(); nuzRender();
   });
   $("nuzReset").addEventListener("click", () => {
@@ -2800,13 +2824,70 @@ async function nuzRender() {
 
   const run = nuzRun();
   nuzRenderSummary(zonas, run);
+  nuzRenderPanels(run);
 
   host.innerHTML = "";
   const frag = document.createDocumentFragment();
-  zonas.forEach(zona => {
+  nuzSortZones(zonas).forEach(zona => {
     frag.appendChild(nuzRenderRow(zona, pool[zona], run[zona]));
   });
   host.appendChild(frag);
+}
+
+// Equipo activo y cementerio
+function nuzRenderPanels(run) {
+  const host = $("nuzPanels");
+  if (!host) return;
+  const entradas = Object.entries(run).filter(([, e]) => e && e.id);
+  const equipo   = entradas.filter(([, e]) => e.status === "team");
+  const muertos  = entradas.filter(([, e]) => e.status === "dead");
+  if (equipo.length === 0 && muertos.length === 0) { host.innerHTML = ""; return; }
+
+  const ficha = ([zona, e]) => {
+    const p = state.allPokemon.find(x => x.id === e.id);
+    return `
+      <button class="nz-card" data-id="${e.id}" title="Ver ficha de ${p ? p.name : e.id}">
+        <img src="${spriteFor(e.id)}" alt="" loading="lazy"/>
+        <span class="nz-card-nick">${e.nick ? e.nick : (p ? cap(p.name) : "#" + e.id)}</span>
+        ${e.nick && p ? `<span class="nz-card-sp">${cap(p.name)}</span>` : ""}
+        <span class="nz-card-zone">${prettyName(zona)}</span>
+      </button>`;
+  };
+
+  host.innerHTML = `
+    ${equipo.length ? `
+      <div class="nuz-panel">
+        <div class="nz-panel-head">
+          <span>🎽 EQUIPO ACTIVO (${equipo.length}${equipo.length > 6 ? " — ¡más de 6!" : "/6"})</span>
+          <button class="nz-send" id="nuzSendTeam">→ Analizar en Equipo</button>
+        </div>
+        <div class="nz-cards">${equipo.map(ficha).join("")}</div>
+      </div>` : ""}
+    ${muertos.length ? `
+      <div class="nuz-panel nz-grave">
+        <div class="nz-panel-head"><span>💀 CEMENTERIO (${muertos.length})</span></div>
+        <div class="nz-cards">${muertos.map(ficha).join("")}</div>
+      </div>` : ""}`;
+
+  host.querySelectorAll(".nz-card").forEach(b => {
+    b.addEventListener("click", () => {
+      switchMode("pokedex");
+      jumpToId(parseInt(b.dataset.id, 10));
+    });
+  });
+  const send = $("nuzSendTeam");
+  if (send) {
+    send.addEventListener("click", async () => {
+      const ids = equipo.slice(0, 6).map(([, e]) => e.id);
+      const arr = (await Promise.all(ids.map(id => fetchPokemonByName(id).catch(() => null)))).filter(Boolean);
+      if (!arr.length) return;
+      teamState.members = arr;
+      saveTeam();
+      await switchMode("team");
+      renderTeamSlots();
+      renderTeamAnalysis();
+    });
+  }
 }
 
 function nuzRenderSummary(zonas, run) {
@@ -2860,9 +2941,12 @@ function nuzRenderRow(zona, especies, entry) {
         <span class="nz-missed">✖ Sin encuentro</span>
       </div>
       <div class="nuz-actions">
-        <button class="nz-clear" type="button">↺ Deshacer</button>
+        ${nuzState.rules.lock
+          ? '<span class="nz-locked">🔒 Bloqueado</span>'
+          : '<button class="nz-clear" type="button">↺ Deshacer</button>'}
       </div>`;
-    row.querySelector(".nz-clear").addEventListener("click", () => nuzSet(zona, null));
+    const undo = row.querySelector(".nz-clear");
+    if (undo) undo.addEventListener("click", () => nuzSet(zona, null));
 
   } else {
     const p = state.allPokemon.find(x => x.id === entry.id);
@@ -2883,7 +2967,9 @@ function nuzRenderRow(zona, especies, entry) {
           ${Object.entries(NUZ_STATUS).filter(([k]) => k !== "missed").map(([k, v]) =>
             `<option value="${k}"${entry.status === k ? " selected" : ""}>${v.icon} ${v.label}</option>`).join("")}
         </select>
-        <button class="nz-clear" type="button">↺</button>
+        ${nuzState.rules.lock
+          ? '<span class="nz-locked" title="Regla activa: no se puede repetir el encuentro">🔒</span>'
+          : '<button class="nz-clear" type="button">↺</button>'}
       </div>
       <div class="nuz-pool-list hidden"></div>`;
 
@@ -2895,8 +2981,9 @@ function nuzRenderRow(zona, especies, entry) {
       nuzRun()[zona].status = e.target.value;
       nuzSave(); nuzRender();
     });
-    row.querySelector(".nz-clear").addEventListener("click", () => nuzSet(zona, null));
-    row.querySelector("img").addEventListener("click", () => {
+    const undo = row.querySelector(".nz-clear");
+    if (undo) undo.addEventListener("click", () => nuzSet(zona, null));
+    row.querySelector(".nuz-mon img").addEventListener("click", () => {
       switchMode("pokedex"); jumpToId(entry.id);
     });
   }

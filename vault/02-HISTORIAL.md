@@ -171,6 +171,24 @@ con el hash puesto. Ahora la ruta se captura al entrar en `loadCatalog`.
 Verificado con `#/pokemon/448` → Lucario, `#/equipo/6,9,3` → los tres, y
 `#/nuzlocke` → el modo con su run restaurado.
 
+## Tanda 12 — Nuzlocke fase 2
+
+- **Orden de zonas.** Antes salían alfabéticas («Celadon City» la primera, que
+  no ayuda a nadie). Ahora las rutas van por número (Ruta 1, 2, 3…) y el resto
+  detrás alfabéticamente, con un selector para volver al alfabético.
+  El orden de visita real **no está en la API**: se comprobó que el
+  `game_index` solo existe para 49 de las 93 zonas de Kanto y solo en gen IV,
+  así que esto es una aproximación deliberada, no el orden exacto del juego.
+- **Equipo activo** con botón «→ Analizar en Equipo», que carga esos Pokémon
+  en el constructor de equipo y abre su análisis de cobertura.
+- **Cementerio**, con los sprites en escala de grises.
+- **Regla «bloquear tras el encuentro»**: quita los botones de deshacer y deja
+  un candado. Es la regla de verdad del Nuzlocke; sin ella se podía repetir la
+  tirada hasta que saliera algo bueno.
+
+Las tarjetas muestran el apodo en grande y la especie debajo, y llevan a la
+ficha al hacer clic.
+
 ## Correcciones a lo que dije por el camino
 
 Tres cosas que reporté mal y conviene no repetir:
