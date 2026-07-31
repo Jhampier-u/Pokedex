@@ -125,6 +125,26 @@ ruido.
 Verificado: Vulpix sale en 13 dexes incluidas las dos de Alola; Pikachu en 19
 con Kanto #025, Johto #022 y Hoenn #156; Ogerpon solo en Kitakami #200.
 
+## Tanda 10 — Paleta de comandos (Ctrl+K)
+
+Buscador único sobre **Pokémon (1025), movimientos (937), habilidades (373) y
+13 acciones** de la app. Reutiliza `fuzzyScore`, así que tolera erratas:
+`charzrd` encuentra a Charizard.
+
+El índice de movimientos y habilidades son dos peticiones de lista que se
+cachean en IndexedDB; a partir de ahí, cero red.
+
+Detalles que hubo que resolver:
+- `Ctrl+K` se intercepta **antes** del `return` para inputs del handler de
+  teclado, porque si no, no se podía abrir mientras escribías en un campo. Y la
+  propia paleta es un input, así que sus teclas también van antes de ese check.
+- Sesgo por grupo en la puntuación (+60 Pokémon, +30 acciones) para que a igual
+  parecido mande el Pokémon, que es lo que se busca casi siempre.
+
+Verificado: abre con Ctrl+K incluso desde un campo de texto, flechas y Enter
+navegan, Escape cierra, y seleccionar un movimiento o habilidad abre su modal
+(Earthquake → «Terremoto», Levitate → «Levitación»).
+
 ## Correcciones a lo que dije por el camino
 
 Tres cosas que reporté mal y conviene no repetir:

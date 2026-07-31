@@ -759,6 +759,17 @@ filterSort.addEventListener("change",   () => applyFilters({ resetIndex: true })
 filterName.addEventListener("input",    () => debouncedFilter(true));
 
 document.addEventListener("keydown", e => {
+  // Ctrl/Cmd+K funciona desde cualquier sitio, incluso escribiendo en un campo
+  if ((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")) {
+    e.preventDefault();
+    togglePalette();
+    return;
+  }
+  const pal = document.getElementById("paletteOverlay");
+  if (pal && !pal.classList.contains("hidden")) {
+    handlePaletteKeys(e);   // antes del check de input: la paleta ES un input
+    return;
+  }
   if (e.target.matches("input, select, textarea")) {
     if (e.key === "Escape") e.target.blur();
     return;
@@ -2265,7 +2276,8 @@ function pdexBuildControls() {
         <div><kbd>F</kbd></div><span>Marcar favorito ★</span>
         <div><kbd>G</kbd></div><span>Marcar capturado ◉</span>
         <div><kbd>L</kbd></div><span>Vista lista / carrusel</span>
-        <div><kbd>/</kbd></div><span>Buscar</span>
+        <div><kbd>/</kbd></div><span>Buscar en la lista</span>
+        <div><kbd>Ctrl</kbd> <kbd>K</kbd></div><span>Buscador rápido (todo)</span>
         <div><kbd>?</kbd></div><span>Esta ayuda</span>
       </div>
     </div>`;
@@ -2437,6 +2449,7 @@ function pdexInit() {
       .map(g => `<option value="${g}">${genOptionLabel(g)}</option>`).join("");
   }
   pdexBuildControls();
+  buildPalette();
   pdexBindControls();
   pdexSyncGenTabs();
   pdexRenderProgress();
@@ -2585,6 +2598,175 @@ async function importData(file) {
   const nNotas = Object.keys(PDEX.notes).length;
   if (st) st.textContent = `✓ Importados ${PDEX.caught.size} capturados, `
         + `${PDEX.favs.size} favoritos y ${nNotas} ${nNotas === 1 ? "nota" : "notas"}.`;
+}
+
+// ════════════════════════════════════════════════════════
+//  PALETA DE COMANDOS  (Ctrl / Cmd + K)
+//  Buscador único sobre Pokémon, movimientos, habilidades y acciones.
+//  Reutiliza fuzzyScore, que ya tolera erratas.
+// ════════════════════════════════════════════════════════
+const PALETTE_MAX = 12;
+const paletteIndex = { moves: null, abilities: null };
+let paletteResults = [], paletteSel = 0, paletteTimer = null;
+
+function paletteActions() {
+  return [
+    { grupo:"Ir a",   icono:"📖", texto:"Pokédex",                 run:() => switchMode("pokedex") },
+    { grupo:"Ir a",   icono:"❓", texto:"Quién es ese Pokémon",     run:() => switchMode("quiz") },
+    { grupo:"Ir a",   icono:"⚔️", texto:"Simulador de batalla",     run:() => switchMode("duel") },
+    { grupo:"Ir a",   icono:"🛡️", texto:"Constructor de equipo",    run:() => switchMode("team") },
+    { grupo:"Ir a",   icono:"🎲", texto:"Ruleta",                   run:() => switchMode("roulette") },
+    { grupo:"Acción", icono:"⌬",  texto:"Pokémon aleatorio",        run:() => { switchMode("pokedex"); navigateRandom(); } },
+    { grupo:"Acción", icono:"✦",  texto:"Alternar shiny",           run:toggleShiny },
+    { grupo:"Acción", icono:"▶",  texto:"Alternar sprite animado",  run:toggleAnimated },
+    { grupo:"Acción", icono:"♪",  texto:"Alternar música",          run:toggleMusic },
+    { grupo:"Acción", icono:"🔊", texto:"Reproducir grito",         run:playCurrentCry },
+    { grupo:"Acción", icono:"🔗", texto:"Copiar enlace",            run:copyShareLink },
+    { grupo:"Acción", icono:"⇄",  texto:"Exportar o importar datos", run:() => openDialog($("dataOverlay"), $("dataExport")) },
+    { grupo:"Acción", icono:"⌨",  texto:"Atajos de teclado",        run:pdexToggleHelp },
+  ];
+}
+
+async function ensurePaletteIndex() {
+  if (paletteIndex.moves && paletteIndex.abilities) return;
+  try {
+    const [mv, ab] = await Promise.all([
+      apiFetch("https://pokeapi.co/api/v2/move?limit=2000"),
+      apiFetch("https://pokeapi.co/api/v2/ability?limit=1000"),
+    ]);
+    paletteIndex.moves     = mv.results.map(r => r.name);
+    paletteIndex.abilities = ab.results.map(r => r.name);
+  } catch {
+    paletteIndex.moves     = paletteIndex.moves     || [];
+    paletteIndex.abilities = paletteIndex.abilities || [];
+  }
+}
+
+function paletteSearch(q) {
+  if (!q) return paletteActions().slice(0, PALETTE_MAX);
+  const scored = [];
+  // El sesgo por grupo hace que, a igual parecido, mande el Pokémon:
+  // es una Pokédex, es lo que se busca el 90% de las veces.
+  state.allPokemon.forEach(p => {
+    const s = fuzzyScore(q, p.name);
+    if (s >= 0) scored.push({ s: s + 60, grupo:"Pokémon", id:p.id,
+      texto: cap(p.name), sub: "#" + padId(p.id),
+      run: () => { switchMode("pokedex"); jumpToId(p.id); } });
+  });
+  paletteActions().forEach(a => {
+    const s = fuzzyScore(q, a.texto.toLowerCase());
+    if (s >= 0) scored.push({ ...a, s: s + 30 });
+  });
+  (paletteIndex.moves || []).forEach(n => {
+    const s = fuzzyScore(q, n);
+    if (s >= 0) scored.push({ s, grupo:"Movimiento", icono:"⚔",
+      texto: prettyName(n), run: () => openMoveModal(n) });
+  });
+  (paletteIndex.abilities || []).forEach(n => {
+    const s = fuzzyScore(q, n);
+    if (s >= 0) scored.push({ s, grupo:"Habilidad", icono:"✧",
+      texto: prettyName(n), run: () => openAbilityModal(n) });
+  });
+  scored.sort((a, b) => b.s - a.s);
+  return scored.slice(0, PALETTE_MAX);
+}
+
+function renderPalette() {
+  const list = $("paletteList");
+  if (paletteResults.length === 0) {
+    list.innerHTML = '<div class="pal-empty">Sin resultados</div>';
+    return;
+  }
+  list.innerHTML = paletteResults.map((r, i) => `
+    <button class="pal-row${i === paletteSel ? " sel" : ""}" data-i="${i}">
+      ${r.grupo === "Pokémon"
+        ? `<img class="pal-sprite" src="${spriteFor(r.id)}" alt="" loading="lazy"/>`
+        : `<span class="pal-icon">${r.icono || "•"}</span>`}
+      <span class="pal-text">${r.texto}</span>
+      ${r.sub ? `<span class="pal-sub">${r.sub}</span>` : ""}
+      <span class="pal-group">${r.grupo}</span>
+    </button>`).join("");
+  list.querySelectorAll(".pal-row").forEach(b => {
+    b.addEventListener("mouseenter", () => {
+      paletteSel = parseInt(b.dataset.i, 10);
+      list.querySelectorAll(".pal-row").forEach((x, i) => x.classList.toggle("sel", i === paletteSel));
+    });
+    b.addEventListener("click", () => runPalette(parseInt(b.dataset.i, 10)));
+  });
+  const sel = list.querySelector(".pal-row.sel");
+  if (sel) sel.scrollIntoView({ block: "nearest" });
+}
+
+function refreshPalette() {
+  paletteResults = paletteSearch($("paletteInput").value.trim().toLowerCase());
+  paletteSel = 0;
+  renderPalette();
+}
+
+function runPalette(i) {
+  const r = paletteResults[i];
+  if (!r) return;
+  closePalette();
+  r.run();
+}
+
+function openPalette() {
+  const ov = $("paletteOverlay");
+  lastFocused = document.activeElement;
+  ov.classList.remove("hidden");
+  const inp = $("paletteInput");
+  inp.value = "";
+  refreshPalette();
+  inp.focus();
+  ensurePaletteIndex().then(() => {
+    // El índice llega después: si sigue abierta y hay texto, repintamos
+    if (!ov.classList.contains("hidden") && inp.value.trim()) refreshPalette();
+  });
+}
+function closePalette() {
+  $("paletteOverlay").classList.add("hidden");
+  if (lastFocused && document.contains(lastFocused)) lastFocused.focus();
+  lastFocused = null;
+}
+function togglePalette() {
+  const ov = $("paletteOverlay");
+  if (!ov) return;
+  if (ov.classList.contains("hidden")) openPalette(); else closePalette();
+}
+
+function handlePaletteKeys(e) {
+  if (e.key === "Escape")      { e.preventDefault(); closePalette(); return; }
+  if (e.key === "ArrowDown")   { e.preventDefault(); paletteSel = Math.min(paletteSel + 1, paletteResults.length - 1); renderPalette(); return; }
+  if (e.key === "ArrowUp")     { e.preventDefault(); paletteSel = Math.max(paletteSel - 1, 0); renderPalette(); return; }
+  if (e.key === "Enter")       { e.preventDefault(); runPalette(paletteSel); return; }
+  if (e.key === "Tab")         { trapFocus($("paletteOverlay").querySelector(".pal-card"), e); }
+}
+
+function buildPalette() {
+  const ov = document.createElement("div");
+  ov.className = "palette-overlay hidden";
+  ov.id = "paletteOverlay";
+  ov.innerHTML = `
+    <div class="pal-card" role="dialog" aria-modal="true" aria-label="Buscador rápido">
+      <div class="pal-input-row">
+        <span class="pal-prompt">⌕</span>
+        <input class="pal-input" id="paletteInput" autocomplete="off" spellcheck="false"
+               placeholder="Busca un Pokémon, movimiento, habilidad o acción…"/>
+        <kbd class="pal-esc">Esc</kbd>
+      </div>
+      <div class="pal-list" id="paletteList"></div>
+      <div class="pal-foot">
+        <span><kbd>↑</kbd><kbd>↓</kbd> moverse</span>
+        <span><kbd>Enter</kbd> abrir</span>
+        <span><kbd>Ctrl</kbd>+<kbd>K</kbd> abrir o cerrar</span>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  $("paletteInput").addEventListener("input", () => {
+    if (paletteTimer) clearTimeout(paletteTimer);
+    paletteTimer = setTimeout(refreshPalette, 90);
+  });
+  ov.addEventListener("click", e => { if (e.target === ov) closePalette(); });
 }
 
 // ════════════════════════════════════════════════════════

@@ -8,25 +8,26 @@
 | | |
 |---|---|
 | Rama | `main`, sincronizada con `origin/main` |
-| Último trabajo | Números de dex regional en la ficha (`git log -1` para el hash) |
+| Último trabajo | Paleta de comandos Ctrl+K (`git log -1` para el hash) |
 | Árbol de trabajo | Limpio, todo pusheado |
 | Remoto | https://github.com/Jhampier-u/Pokedex |
 | Servidor local | `python -m http.server 5599` (ya está en `.claude/launch.json` como `pokedex-static`) |
 
 ## Qué se acaba de terminar
 
-Dos cosas seguidas:
+Tres cosas seguidas:
 
-1. **Modalidades del quiz** — además de la silueta, se puede adivinar por
-   grito, por entrada de Pokédex o por estadísticas, con contrarreloj de 10 s.
-2. **Números de dex regional** en la ficha, con 0 peticiones nuevas porque el
-   dato ya venía en `pokemon-species`.
+1. **Modalidades del quiz** — silueta, grito, entrada de Pokédex o
+   estadísticas, con contrarreloj de 10 s.
+2. **Números de dex regional** en la ficha, con 0 peticiones nuevas.
+3. **Paleta de comandos (Ctrl+K)** — buscador único sobre Pokémon,
+   movimientos, habilidades y acciones.
 
 ## Qué toca ahora
 
-Nada empezado. Lo siguiente por prioridad está en
-[`03-PENDIENTES.md`](03-PENDIENTES.md). Los candidatos son el **tracker
-Nuzlocke** (el más ambicioso) y la **paleta de comandos Ctrl+K**.
+Nada empezado. De [`03-PENDIENTES.md`](03-PENDIENTES.md) queda como pieza
+grande el **tracker Nuzlocke**, y como opcionales filtrar por Pokédex regional
+y la deuda menor.
 
 Antes de nada, lee la corrección nº 0 de [`02-HISTORIAL.md`](02-HISTORIAL.md):
 las pestañas de región filtran por *generación de origen* y eso **es

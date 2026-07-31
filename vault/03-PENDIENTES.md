@@ -39,15 +39,7 @@ Es un proyecto en sí mismo. Merecería su propio modo.
 
 ---
 
-## 3. Paleta de comandos (Ctrl+K) · esfuerzo medio
-
-Buscador global unificado sobre Pokémon, movimientos, habilidades y objetos.
-La búsqueda difusa (`fuzzyScore`) ya existe y funciona bien; faltaría un índice
-de movimientos/habilidades y el overlay.
-
----
-
-## 4. Deuda menor
+## 3. Deuda menor
 
 - **`detailCache` sin tope.** Ya no es agudo (con GraphQL no se descargan los
   1025 objetos completos), pero sigue creciendo sin límite mientras navegas.
