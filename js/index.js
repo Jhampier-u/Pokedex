@@ -2961,19 +2961,18 @@ async function initNuzlocke() {
   sel.innerHTML = '<option value="">— Elige juego —</option>' +
     versions.map(v => `<option value="${v}">${prettyVersion(v)}</option>`).join("");
 
+  // Cambiar de juego con datos ya metidos NO los destruye: crea un run nuevo.
+  // Antes pedía confirmación, pero confirm() tampoco es fiable (ver nuzNew).
   sel.addEventListener("change", async () => {
     const r = nuzActive();
-    if (!r) { nuzNewRun(sel.value, `Run de ${prettyVersion(sel.value)}`); }
-    else {
-      const tieneDatos = Object.keys(r.zones).length > 0;
-      if (tieneDatos && !confirm(
-        `Cambiar de juego vacía las zonas de «${r.name}», porque son de otro juego. ¿Seguir?`)) {
-        sel.value = r.version;
-        return;
-      }
+    if (!r) {
+      nuzNewRun(sel.value, nuzNombrePorDefecto(sel.value));
+    } else if (Object.keys(r.zones).length > 0 && r.version !== sel.value) {
+      nuzNewRun(sel.value, nuzNombrePorDefecto(sel.value));
+      toast("Run nuevo creado; el anterior se conserva");
+    } else {
       r.version = sel.value;
-      r.zones = {};
-      r.log = [];
+      r.zones = {}; r.log = [];
     }
     nuzSave();
     nuzRefreshRunSelect();
@@ -2981,26 +2980,34 @@ async function initNuzlocke() {
   });
 
   // ── Gestor de runs ──
+  // Sin prompt() ni confirm(): en muchos navegadores embebidos devuelven null
+  // o ni se muestran, y el botón parecía no hacer nada.
   $("nuzNew").addEventListener("click", async () => {
-    const nombre = prompt("Nombre del run nuevo:", "Nuzlocke " + (Object.keys(nuzState.runs).length + 1));
-    if (nombre === null) return;
-    nuzNewRun(sel.value || "", nombre.trim() || "Run nuevo");
+    nuzNewRun(sel.value || "", nuzNombrePorDefecto(sel.value));
     nuzRefreshRunSelect();
     await nuzRender();
+    nuzStartRename();          // se crea y se deja el nombre listo para editar
   });
-  $("nuzRename").addEventListener("click", () => {
-    const r = nuzActive(); if (!r) return;
-    const nombre = prompt("Nuevo nombre:", r.name);
-    if (nombre === null) return;
-    r.name = nombre.trim() || r.name;
-    nuzSave(); nuzRefreshRunSelect();
+  $("nuzRename").addEventListener("click", nuzStartRename);
+
+  const inp = $("nuzRunName");
+  inp.addEventListener("keydown", e => {
+    e.stopPropagation();       // que no lo capture el manejador global
+    if (e.key === "Enter")  { e.preventDefault(); nuzCommitRename(true); }
+    if (e.key === "Escape") { e.preventDefault(); nuzCommitRename(false); }
   });
-  $("nuzDelete").addEventListener("click", async () => {
+  inp.addEventListener("blur", () => {
+    if (!inp.classList.contains("hidden")) nuzCommitRename(true);
+  });
+
+  $("nuzDelete").addEventListener("click", () => {
     const r = nuzActive(); if (!r) return;
-    if (!confirm(`¿Borrar el run «${r.name}» entero? No se puede deshacer.`)) return;
-    delete nuzState.runs[r.id];
-    nuzState.activeId = Object.keys(nuzState.runs)[0] || "";
-    nuzSave(); nuzRefreshRunSelect(); await nuzRender();
+    nuzArmar($("nuzDelete"), "¿Seguro?", async () => {
+      delete nuzState.runs[r.id];
+      nuzState.activeId = Object.keys(nuzState.runs)[0] || "";
+      nuzSave(); nuzRefreshRunSelect(); await nuzRender();
+      toast("Run borrado");
+    });
   });
   $("nuzRun").addEventListener("change", async e => {
     nuzState.activeId = e.target.value;
@@ -3020,13 +3027,65 @@ async function initNuzlocke() {
   });
   $("nuzReset").addEventListener("click", () => {
     const r = nuzActive(); if (!r) return;
-    if (!confirm(`¿Vaciar las zonas de «${r.name}»? El run se conserva, pero pierdes lo capturado.`)) return;
-    r.zones = {}; r.log = [];
-    nuzSave(); nuzRender();
+    nuzArmar($("nuzReset"), "¿Seguro? Se pierde todo", () => {
+      r.zones = {}; r.log = [];
+      nuzSave(); nuzRender();
+      toast("Run vaciado");
+    });
   });
 
   nuzRefreshRunSelect();
   if (nuzVersion()) await nuzRender();
+}
+
+function nuzNombrePorDefecto(version) {
+  const base = version ? `Run de ${prettyVersion(version)}` : "Run nuevo";
+  const usados = new Set(Object.values(nuzState.runs).map(r => r.name));
+  if (!usados.has(base)) return base;
+  let n = 2;
+  while (usados.has(`${base} ${n}`)) n++;
+  return `${base} ${n}`;
+}
+
+// Renombrar en línea: el <select> se cambia por un <input> y vuelve al confirmar
+function nuzStartRename() {
+  const r = nuzActive(); if (!r) return;
+  const sel = $("nuzRun"), inp = $("nuzRunName");
+  inp.value = r.name;
+  sel.classList.add("hidden");
+  inp.classList.remove("hidden");
+  inp.focus(); inp.select();
+}
+function nuzCommitRename(guardar) {
+  const r = nuzActive();
+  const sel = $("nuzRun"), inp = $("nuzRunName");
+  if (r && guardar) {
+    const nuevo = inp.value.trim();
+    if (nuevo) { r.name = nuevo; nuzSave(); }
+  }
+  inp.classList.add("hidden");
+  sel.classList.remove("hidden");
+  nuzRefreshRunSelect();
+}
+
+// Confirmación en dos pasos dentro del propio botón, en vez de confirm()
+function nuzArmar(btn, etiqueta, accion) {
+  if (btn.dataset.armed === "1") {
+    clearTimeout(Number(btn.dataset.timer));
+    nuzDesarmar(btn);
+    accion();
+    return;
+  }
+  if (!btn.dataset.label) btn.dataset.label = btn.textContent;
+  btn.dataset.armed = "1";
+  btn.textContent = etiqueta;
+  btn.classList.add("armed");
+  btn.dataset.timer = String(setTimeout(() => nuzDesarmar(btn), 4000));
+}
+function nuzDesarmar(btn) {
+  btn.dataset.armed = "0";
+  if (btn.dataset.label) btn.textContent = btn.dataset.label;
+  btn.classList.remove("armed");
 }
 
 function nuzRefreshRunSelect() {
@@ -3043,7 +3102,10 @@ function nuzRefreshRunSelect() {
   const vs = $("nuzVersion");
   if (vs) vs.value = nuzVersion();
   ["nuzRename", "nuzDelete", "nuzReset"].forEach(id => {
-    const b = $(id); if (b) b.disabled = runs.length === 0;
+    const b = $(id);
+    if (!b) return;
+    b.disabled = runs.length === 0;
+    if (b.disabled) nuzDesarmar(b);   // que no se quede "armado" al quedarse sin runs
   });
 }
 

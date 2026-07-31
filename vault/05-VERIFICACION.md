@@ -62,6 +62,34 @@ Usa introspección antes de escribir una consulta:
 { __type(name:"pokemon_v2_nature") { fields { name } } }
 ```
 
+### Nunca sustituyas `prompt`/`confirm`/`alert` para que pase una prueba
+
+Es la trampa que ha causado el único bug que llegó al usuario. Probé el gestor
+de runs del Nuzlocke con `window.prompt = () => 'nombre'` y todo pasaba; en el
+navegador real `prompt()` devolvía `null` y el botón «＋» no hacía nada.
+
+Sustituir un diálogo **oculta justo lo que hay que comprobar**. Si el código
+usa un diálogo bloqueante, la prueba no puede ser fiable: lo correcto es
+**quitar el diálogo del código** (hay confirmación en dos pasos y renombrado en
+línea ya implementados como referencia) y luego probarlo de verdad.
+
+Truco útil: en la prueba, redefinir los diálogos para que **marquen un fallo**
+en lugar de devolver un valor válido:
+
+```js
+let usoDialogo = false;
+window.prompt  = () => { usoDialogo = 'prompt';  return null; };
+window.confirm = () => { usoDialogo = 'confirm'; return false; };
+// ...y al final comprobar que usoDialogo sigue siendo false
+```
+
+### Prueba el camino de carga inicial, no solo el de navegación
+
+Mismo tipo de error: las rutas compartibles se probaron cambiando
+`location.hash` sobre una página ya cargada (que va por `hashchange`) y nunca
+recargando con el hash puesto. Estuvieron rotas desde el primer día sin que
+saliera en ninguna prueba.
+
 ### Cuidado con las métricas propias
 
 El «108 selectores CSS duplicados» que reporté era un artefacto de mi propio

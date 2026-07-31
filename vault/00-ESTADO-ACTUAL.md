@@ -8,30 +8,27 @@
 | | |
 |---|---|
 | Rama | `main`, sincronizada con `origin/main` |
-| Último trabajo | Nuzlocke: varios runs y línea temporal (`git log -1` para el hash) |
+| Último trabajo | Arreglo del gestor de runs del Nuzlocke (`git log -1` para el hash) |
 | Árbol de trabajo | Limpio, todo pusheado |
 | Remoto | https://github.com/Jhampier-u/Pokedex |
 | Servidor local | `python -m http.server 5599` (ya está en `.claude/launch.json` como `pokedex-static`) |
 
 ## Qué se acaba de terminar
 
-**Nuzlocke: varios runs guardados y línea temporal.** Cada run tiene nombre y
-juego propios (caben varios del mismo juego), con migración automática del
-formato antiguo. Y cada run lleva su bitácora de capturas, muertes y fallos.
+**Arreglo de un bug reportado por el usuario**: el botón «＋» del Nuzlocke no
+creaba runs porque usaba `prompt()`, que en su navegador devolvía `null`.
+Fuera los diálogos bloqueantes: renombrado en línea y confirmación en dos pasos
+dentro del propio botón. Ver Tanda 15 en [`02-HISTORIAL.md`](02-HISTORIAL.md).
 
 ## Qué toca ahora
 
-**El backlog está agotado.** En [`03-PENDIENTES.md`](03-PENDIENTES.md) solo
-quedan ideas opcionales (más reglas de Nuzlocke, orden de visita real de las
-zonas —que exigiría listas a mano—) y una decisión del usuario sobre
-`Tareas Por Hacer.txt`.
+Nada empezado. El backlog de funciones está agotado; en
+[`03-PENDIENTES.md`](03-PENDIENTES.md) solo quedan ideas opcionales.
 
-Lo más útil ahora es **usar la app**: se ha verificado todo por consola, pero
-el diseño en móvil y la comodidad de uso solo se juzgan usándola.
-
-Antes de nada, lee la corrección nº 0 de [`02-HISTORIAL.md`](02-HISTORIAL.md):
-las pestañas «Por generación» filtran por *generación de origen* y eso **es
-correcto**. El filtro «Por Pokédex regional» es el otro eje, y ya existe.
+**Lo más útil es seguir usando la app.** El bug de la Tanda 15 lo encontró el
+usuario en dos minutos y quince tandas de pruebas por consola no lo vieron.
+Lee las dos primeras trampas de [`05-VERIFICACION.md`](05-VERIFICACION.md)
+antes de dar nada por verificado.
 
 ## Antes de tocar nada
 

@@ -2685,6 +2685,11 @@ kbd {
 .nz-mini:hover:not(:disabled) { border-color: var(--yellow); color: var(--yellow); }
 .nz-mini:disabled { opacity: 0.3; cursor: not-allowed; }
 .nz-mini.nz-danger:hover:not(:disabled) { border-color: #FF6666; color: #FF8888; }
+/* Confirmación en dos pasos: el botón se pone en rojo y pide un segundo clic */
+.nz-mini.armed, .nuz-reset.armed {
+  border-color: #FF5555; color: #FF8888; background: #1a0c0c;
+  font-size: 11px; letter-spacing: 1px;
+}
 
 .nuz-timeline {
   background: #0d0d0d; border: 2px solid #262626; border-radius: 6px;

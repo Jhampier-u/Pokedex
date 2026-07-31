@@ -246,6 +246,33 @@ independientes del mismo juego, los cuatro tipos de evento en la bitácora
 export/import de ida y vuelta con log incluido, y renombrar/borrar dejando los
 botones deshabilitados cuando no queda ninguno.
 
+## Tanda 15 — Bug reportado por el usuario: el gestor de runs no funcionaba
+
+**Primer bug que llegó al usuario.** El botón «＋» del Nuzlocke no hacía nada y
+el selector de runs salía vacío (y por tanto «✎» y «🗑» salían deshabilitados,
+que es correcto cuando no hay runs).
+
+Causa: usaba `prompt()` para pedir el nombre. En el navegador del usuario
+devolvía `null`, y el código hacía `if (nombre === null) return;`. La lógica de
+creación estaba bien; el diálogo era el problema.
+
+**Por qué no se detectó:** en las pruebas hice `window.prompt = () => 'nombre'`.
+Sustituir el diálogo ocultaba exactamente lo que había que comprobar. Anotado
+en `05-VERIFICACION.md` como trampa a no repetir.
+
+Arreglo, quitando los diálogos bloqueantes en vez de parchearlos:
+- «＋» crea el run al momento con un nombre por defecto no repetido y deja el
+  campo listo para editar.
+- Renombrado **en línea**: el `<select>` se cambia por un `<input>`; Enter
+  guarda, Escape cancela, perder el foco guarda.
+- Borrar y vaciar usan **confirmación en dos pasos dentro del propio botón**
+  («¿Seguro?» en rojo, caduca a los 4 s).
+- Cambiar de juego con datos ya metidos **ya no los destruye**: crea un run
+  nuevo y conserva el anterior, así que no hace falta confirmar nada.
+
+Verificado con `prompt` y `confirm` redefinidos para **marcar fallo** si
+alguien los llama: no se usa ninguno.
+
 ## Correcciones a lo que dije por el camino
 
 Tres cosas que reporté mal y conviene no repetir:
