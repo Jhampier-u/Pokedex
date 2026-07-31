@@ -11,6 +11,7 @@
 | Último trabajo | Accesibilidad de teclado y auditoría de tablet (`git log -1` para el hash) |
 | Árbol de trabajo | Limpio, todo pusheado |
 | Remoto | https://github.com/Jhampier-u/Pokedex |
+| Desplegado | https://jhampier-u.github.io/Pokedex/ (GitHub Pages, verificado) |
 | Servidor local | `python -m http.server 5599` (ya está en `.claude/launch.json` como `pokedex-static`) |
 
 ## Qué se acaba de terminar

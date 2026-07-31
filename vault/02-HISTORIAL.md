@@ -354,6 +354,29 @@ Nota honesta: la comprobación final del contorno se hizo por CSSOM y con un
 elemento de prueba, porque las pulsaciones reales de Tab no llegaban al panel
 de forma fiable. Una pulsación sí llegó y confirmó que la regla se activa.
 
+## Verificación del despliegue (GitHub Pages)
+
+El proyecto está publicado en **https://jhampier-u.github.io/Pokedex/**.
+Se había predicho que funcionaría en un subdirectorio porque las rutas son
+relativas; ahora está **comprobado**, no predicho:
+
+- Service worker registrado y activo con scope `/Pokedex/` (lo que más suele
+  romperse al desplegar en subruta).
+- Manifiesto servido, con `start_url` y `scope` relativos.
+- CSS, JS, service worker e icono: los cuatro a 200.
+- Enlaces compartibles funcionando en la subruta:
+  `#/equipo/6,9,3` carga Charizard, Blastoise y Venusaur.
+- Sin conexión: el catálogo de 1025 sale de IndexedDB. Shell cacheado
+  (10 archivos) y servible.
+- La versión desplegada está al día (tiene hasta la Tanda 18).
+- Sin errores en consola.
+
+**Pega suelta encontrada:** el icono del manifiesto es de 1024×1024 pero el
+contenido ocupa el 100% del lienzo, sin margen. Medido: 0% de margen por
+arriba y por la izquierda. Por eso **no debe declararse `purpose: "maskable"`**
+—Android lo recorta en círculo y se comería el borde del icono—. Para tener
+icono adaptativo haría falta una versión con el 20% de zona segura.
+
 ## Correcciones a lo que dije por el camino
 
 Tres cosas que reporté mal y conviene no repetir:

@@ -23,6 +23,10 @@ Fases 1 y 2 hechas. Ideas que quedaron fuera:
   usuario decida si se borra** — no borrar sin preguntar.
 - **`applyFilters` con `resetIndex`** al cargar stats: ya se arregló, pero hay
   otros sitios que resetean posición y convendría revisarlos si molesta.
+- **Icono adaptativo para Android.** El icono actual (1024×1024) tiene el
+  contenido pegado al borde: 0% de margen. No se puede declarar
+  `purpose: "maskable"` sin que Android le recorte el borde. Haría falta una
+  versión con ~20% de zona segura alrededor. Cosmético.
 
 ---
 
