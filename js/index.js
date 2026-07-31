@@ -1189,9 +1189,61 @@ async function openItemModal(name) {
       ${d.cost ? `<span class="modal-cat">${d.cost} ₽</span>` : ""}
     </div>
     <div class="modal-section-title">◆ DESCRIPCIÓN</div>
-    <div class="modal-description">${itemTextEs(d)}</div>`;
+    <div class="modal-description">${itemTextEs(d)}</div>
+    <div id="modalBerry"></div>`;
   modalLoading.classList.add("hidden");
   modalContent.classList.remove("hidden");
+  if (d.name.endsWith("-berry")) renderBerryDetail(d.name.replace(/-berry$/, ""));
+}
+
+// ── Detalle de baya ──────────────────────────────────────
+const FLAVOR_LABELS = { spicy:"Picante", dry:"Seco", sweet:"Dulce",
+                        bitter:"Amargo", sour:"Ácido" };
+const FIRMNESS_LABELS = { "very-soft":"Muy blanda", soft:"Blanda", hard:"Dura",
+                          "very-hard":"Muy dura", super_hard:"Durísima" };
+
+async function renderBerryDetail(nombre) {
+  const host = document.getElementById("modalBerry");
+  if (!host) return;
+  let b;
+  try { b = await apiFetch(`https://pokeapi.co/api/v2/berry/${nombre}`); }
+  catch { return; }
+  if (!document.getElementById("modalBerry")) return;   // el modal ya se cerró
+
+  const sabores = b.flavors.filter(f => f.potency > 0)
+    .sort((a, c) => c.potency - a.potency);
+  await ensureNatures();
+  // El sabor dominante decide qué naturalezas la aprecian y cuáles la detestan
+  const dom = sabores[0]?.flavor.name;
+  const gustan = (NATURES || []).filter(n => n.gusta === dom);
+  const odian  = (NATURES || []).filter(n => n.odia  === dom);
+
+  host.innerHTML = `
+    <div class="modal-section-title">◆ DATOS DE LA BAYA</div>
+    <div class="berry-grid">
+      <div class="berry-cell"><span>Tamaño</span><b>${(b.size / 10).toFixed(1)} cm</b></div>
+      <div class="berry-cell"><span>Firmeza</span><b>${FIRMNESS_LABELS[b.firmness.name] || prettyName(b.firmness.name)}</b></div>
+      <div class="berry-cell"><span>Crecimiento</span><b>${b.growth_time} h/fase</b></div>
+      <div class="berry-cell"><span>Cosecha máx.</span><b>${b.max_harvest}</b></div>
+      <div class="berry-cell"><span>Jugosidad</span><b>${b.smoothness}</b></div>
+      <div class="berry-cell"><span>Seca el suelo</span><b>${b.soil_dryness}</b></div>
+    </div>
+    ${sabores.length ? `
+      <div class="modal-section-title">◆ SABORES</div>
+      <div class="berry-flavors">
+        ${sabores.map(f => `
+          <span class="berry-flavor flavor-${f.flavor.name}">
+            ${FLAVOR_LABELS[f.flavor.name] || f.flavor.name}
+            <b>${f.potency}</b>
+          </span>`).join("")}
+      </div>` : ""}
+    ${dom && (gustan.length || odian.length) ? `
+      <div class="modal-section-title">◆ NATURALEZAS</div>
+      <p class="berry-nat">
+        Sabor dominante <b>${FLAVOR_LABELS[dom] || dom}</b>.
+        ${gustan.length ? `Les gusta a: <span class="berry-ok">${gustan.map(n => n.es).join(", ")}</span>. ` : ""}
+        ${odian.length ? `La detestan: <span class="berry-no">${odian.map(n => n.es).join(", ")}</span>.` : ""}
+      </p>` : ""}`;
 }
 
 function renderHeldItems(data) {
@@ -1594,12 +1646,18 @@ function buildEvolutionTree(node, currentId) {
   return wrapper;
 }
 
+// Devuelve HTML: los objetos de evolución se muestran con su sprite, que la
+// API ya sirve, en vez de solo con el nombre.
 function parseEvolutionMethod(d) {
   if (!d) return "?";
+  const conSprite = (nombre, prefijo = "") =>
+    `<span class="evo-item">${prefijo}` +
+    `<img src="${ITEM_SPRITE(nombre)}" alt="" loading="lazy"/>` +
+    `${prettyName(nombre)}</span>`;
   const parts = [];
   if (d.min_level)   parts.push(`Nv. ${d.min_level}`);
-  if (d.item)        parts.push(prettyName(d.item.name));
-  if (d.held_item)   parts.push("c/" + prettyName(d.held_item.name));
+  if (d.item)        parts.push(conSprite(d.item.name));
+  if (d.held_item)   parts.push(conSprite(d.held_item.name, "c/"));
   if (d.known_move)  parts.push("sabe " + prettyName(d.known_move.name));
   if (d.location)    parts.push("en " + prettyName(d.location.name));
   if (d.min_happiness) parts.push("Felicidad");
@@ -3753,7 +3811,59 @@ function buildSpriteGallery() {
 //  Reutiliza fuzzyScore, que ya tolera erratas.
 // ════════════════════════════════════════════════════════
 const PALETTE_MAX = 12;
-const paletteIndex = { moves: null, abilities: null };
+const paletteIndex = { moves: null, abilities: null, items: null };
+
+// Categorías de objeto que vale la pena poder buscar. Se dejan fuera las MT
+// (339), los cristales Dinamax (300), los materiales (222), los marcados como
+// `unused` (122) y los de picnic: son ruido en un buscador.
+const ITEM_CATEGORIES = [
+  "standard-balls","special-balls","apricorn-balls",
+  "healing","status-cures","revival","vitamins","effort-training",
+  "evolution","held-items","choice","bad-held-items",
+  "type-enhancement","type-protection","species-specific",
+  "jewels","mega-stones","plates","memories","z-crystals",
+];
+// v2: se añadió el nombre en español. Sin él, buscar «zreza» no encontraba la
+// Baya Zreza, que es como se llama en la ficha; solo valía el nombre inglés.
+const ITEMS_KEY = "items:index:v2";
+
+async function ensureItemIndex() {
+  if (paletteIndex.items) return paletteIndex.items;
+  try {
+    const entry = await idbGet(ITEMS_KEY);
+    let filas;
+    if (entry && Date.now() - entry.ts < CACHE_TTL) {
+      filas = entry.data;
+    } else {
+      // Categorías útiles + todas las bayas, en una sola consulta
+      const query = `query Items {
+        pokemon_v2_item(
+          where: {_or: [
+            {pokemon_v2_itemcategory: {name: {_in: ${JSON.stringify(ITEM_CATEGORIES)}}}},
+            {name: {_like: "%-berry"}}
+          ]},
+          order_by: {name: asc}
+        ) {
+          name
+          pokemon_v2_itemnames(where: {language_id: {_eq: 7}}) { name }
+        }
+      }`;
+      const res  = await fetch(GRAPHQL_URL, { method:"POST",
+        headers:{"Content-Type":"application/json"}, body: JSON.stringify({ query }) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      if (json.errors) throw new Error("GraphQL");
+      filas = (json.data?.pokemon_v2_item || []).map(i => ({
+        name: i.name,
+        es:   i.pokemon_v2_itemnames?.[0]?.name || null,
+      }));
+      if (filas.length === 0) throw new Error("0 objetos");
+      idbSet(ITEMS_KEY, { ts: Date.now(), data: filas });
+    }
+    paletteIndex.items = filas;
+  } catch { paletteIndex.items = []; }
+  return paletteIndex.items;
+}
 let paletteResults = [], paletteSel = 0, paletteTimer = null;
 
 function paletteActions() {
@@ -3776,18 +3886,24 @@ function paletteActions() {
 }
 
 async function ensurePaletteIndex() {
-  if (paletteIndex.moves && paletteIndex.abilities) return;
-  try {
-    const [mv, ab] = await Promise.all([
-      apiFetch("https://pokeapi.co/api/v2/move?limit=2000"),
-      apiFetch("https://pokeapi.co/api/v2/ability?limit=1000"),
-    ]);
-    paletteIndex.moves     = mv.results.map(r => r.name);
-    paletteIndex.abilities = ab.results.map(r => r.name);
-  } catch {
-    paletteIndex.moves     = paletteIndex.moves     || [];
-    paletteIndex.abilities = paletteIndex.abilities || [];
+  const pendiente = [];
+  if (!paletteIndex.moves || !paletteIndex.abilities) {
+    pendiente.push((async () => {
+      try {
+        const [mv, ab] = await Promise.all([
+          apiFetch("https://pokeapi.co/api/v2/move?limit=2000"),
+          apiFetch("https://pokeapi.co/api/v2/ability?limit=1000"),
+        ]);
+        paletteIndex.moves     = mv.results.map(r => r.name);
+        paletteIndex.abilities = ab.results.map(r => r.name);
+      } catch {
+        paletteIndex.moves     = paletteIndex.moves     || [];
+        paletteIndex.abilities = paletteIndex.abilities || [];
+      }
+    })());
   }
+  if (!paletteIndex.items) pendiente.push(ensureItemIndex());
+  await Promise.all(pendiente);
 }
 
 function paletteSearch(q) {
@@ -3815,6 +3931,16 @@ function paletteSearch(q) {
     if (s >= 0) scored.push({ s, grupo:"Habilidad", icono:"✧",
       texto: prettyName(n), run: () => openAbilityModal(n) });
   });
+  (paletteIndex.items || []).forEach(it => {
+    // Se busca por los dos nombres y manda el que mejor case
+    const sEn = fuzzyScore(q, it.name);
+    const sEs = it.es ? fuzzyScore(q, it.es) : -1;
+    const s = Math.max(sEn, sEs);
+    if (s >= 0) scored.push({ s: s + 10, grupo: it.name.endsWith("-berry") ? "Baya" : "Objeto",
+      sprite: ITEM_SPRITE(it.name), texto: it.es || prettyName(it.name),
+      sub: it.es ? prettyName(it.name) : "",
+      run: () => openItemModal(it.name) });
+  });
   scored.sort((a, b) => b.s - a.s);
   return scored.slice(0, PALETTE_MAX);
 }
@@ -3829,6 +3955,8 @@ function renderPalette() {
     <button class="pal-row${i === paletteSel ? " sel" : ""}" data-i="${i}">
       ${r.grupo === "Pokémon"
         ? `<img class="pal-sprite" src="${spriteFor(r.id)}" alt="" loading="lazy"/>`
+        : r.sprite
+        ? `<img class="pal-sprite pal-item" src="${r.sprite}" alt="" loading="lazy"/>`
         : `<span class="pal-icon">${r.icono || "•"}</span>`}
       <span class="pal-text">${r.texto}</span>
       ${r.sub ? `<span class="pal-sub">${r.sub}</span>` : ""}
@@ -4436,7 +4564,9 @@ async function onMoveSelect(side, moveName) {
 // ════════════════════════════════════════════════════════
 //  NATURALEZAS  ·  ESTADÍSTICAS REALES  ·  DAÑO
 // ════════════════════════════════════════════════════════
-const NATURES_KEY = "natures:v1";
+// v2: se añadieron los sabores que prefiere y detesta cada naturaleza, que es
+// lo que enlaza las bayas con el simulador de batalla.
+const NATURES_KEY = "natures:v2";
 let NATURES = null;   // [{name, es, up, down}]
 
 async function ensureNatures() {
@@ -4452,6 +4582,8 @@ async function ensureNatures() {
           name
           pokemonV2StatByIncreasedStatId { name }
           pokemon_v2_stat { name }
+          pokemonV2BerryflavorByLikesFlavorId { name }
+          pokemon_v2_berryflavor { name }
           pokemon_v2_naturenames(where: {language_id: {_eq: 7}}) { name }
         }
       }`;
@@ -4467,6 +4599,8 @@ async function ensureNatures() {
         es:   n.pokemon_v2_naturenames?.[0]?.name || cap(n.name),
         up:   n.pokemonV2StatByIncreasedStatId?.name || null,
         down: n.pokemon_v2_stat?.name || null,
+        gusta:  n.pokemonV2BerryflavorByLikesFlavorId?.name || null,
+        odia:   n.pokemon_v2_berryflavor?.name || null,
       }));
       if (rows.length === 0) throw new Error("0 filas");
       idbSet(NATURES_KEY, { ts: Date.now(), data: rows });

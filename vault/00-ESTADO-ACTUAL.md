@@ -8,7 +8,7 @@
 | | |
 |---|---|
 | Rama | `main`, sincronizada con `origin/main` |
-| Último trabajo | Objetos que lleva y captura por Pokéball (`git log -1` para el hash) |
+| Último trabajo | Objetos y bayas en el buscador Ctrl+K (`git log -1` para el hash) |
 | Árbol de trabajo | Limpio, todo pusheado |
 | Remoto | https://github.com/Jhampier-u/Pokedex |
 | Desplegado | https://jhampier-u.github.io/Pokedex/ (GitHub Pages, verificado) |
@@ -16,18 +16,19 @@
 
 ## Qué se acaba de terminar
 
-**Objetos, pero solo las conexiones útiles**, no un catálogo suelto:
+**Objetos y bayas buscables.** 492 objetos y bayas en el buscador Ctrl+K, con
+búsqueda bilingüe (buscar «zreza» encuentra la Baya Zreza). Ficha de baya con
+sabores y **qué naturalezas la aprecian**, que enlaza con el simulador de
+batalla. Y sprites de objeto en la cadena evolutiva.
 
-1. **Objetos que lleva en salvaje** con su rareza (dato que ya se descargaba).
-2. **Captura por Pokéball**: 10 balls con su probabilidad real para ese
-   Pokémon, resolviendo las condicionadas por tipo.
-3. Ficha de objeto en el modal, con sprite y descripción en español.
+Se descartó hacer una **sección** de bayas: habría sido el catálogo aislado que
+se desaconsejó en la Tanda 21. Meterlas en el buscador las hace alcanzables sin
+crear una vista que nadie visita.
 
 ## Qué toca ahora
 
-Nada empezado. De la lista de objetos quedarían los sprites de objeto en la
-cadena evolutiva (ahora «Piedra Fuego» es solo texto) y una sección de bayas,
-ambas opcionales. Ver [`03-PENDIENTES.md`](03-PENDIENTES.md).
+Nada empezado. Con esto se cierra el bloque de objetos. Lo que queda en
+[`03-PENDIENTES.md`](03-PENDIENTES.md) son ideas menores.
 
 ## Antes de tocar nada
 

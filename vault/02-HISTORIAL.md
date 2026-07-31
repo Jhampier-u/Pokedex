@@ -466,6 +466,36 @@ Detalle: se coge la **última** entrada de `flavor_text_entries`, no la primera.
 Con la primera, «Restos» mostraba la descripción del Pañuelo Seda; hay objetos
 con los textos descolocados en la API.
 
+## Tanda 22 — Objetos y bayas en el buscador
+
+Se pidieron dos cosas: sprites de objeto en la cadena evolutiva y una sección
+de bayas. La primera se hizo tal cual. La segunda **se cambió de forma**, y se
+propuso antes de hacerla: una sección de bayas habría sido el catálogo aislado
+que se había desaconsejado dos tandas antes. En su lugar, objetos y bayas se
+metieron **en el buscador Ctrl+K**, que ya existía, con ficha propia.
+
+**Sprites en la evolución.** Eevee muestra Piedra Agua, Piedra Trueno y Piedra
+Fuego con su imagen en vez de solo el nombre.
+
+**492 objetos y bayas buscables.** Una consulta GraphQL con las categorías que
+valen la pena; se dejan fuera las 339 MT, los 300 cristales Dinamax, los 122
+`unused` y los de picnic, que en un buscador son ruido.
+
+**Búsqueda bilingüe.** La primera versión solo indexaba el nombre inglés, pero
+la ficha dice «Baya Zreza»: buscar «zreza» no encontraba nada. Ahora se busca
+por los dos nombres y se muestra el español con el inglés debajo. 454 de 492
+tienen nombre en español.
+
+**Ficha de baya** con tamaño, firmeza, crecimiento, cosecha, jugosidad, sabores
+y —lo interesante— **qué naturalezas la aprecian**. Las naturalezas prefieren y
+detestan sabores, así que la Baya Zreza (Picante 10) gusta a Huraña, Firme,
+Pícara y Audaz, que son justo las que suben Ataque, y la detestan Osada,
+Modesta, Serena y Miedosa, que lo bajan. Conecta las bayas con el simulador de
+batalla en vez de dejarlas como dato suelto.
+
+Para esto se amplió la consulta de naturalezas con `likes_flavor` y
+`hates_flavor` (caché `natures:v2`).
+
 ## Correcciones a lo que dije por el camino
 
 Tres cosas que reporté mal y conviene no repetir:

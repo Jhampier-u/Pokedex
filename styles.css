@@ -4033,3 +4033,45 @@ body.retro-gen .pokedex-card { box-shadow: inset 0 0 0 2px rgba(255,215,0,0.18);
 .modal-item-sprite {
   width: 42px; height: 42px; image-rendering: pixelated;
 }
+
+/* Objeto de evolución con su sprite dentro de la flecha */
+.evo-item {
+  display: inline-flex; align-items: center; gap: 3px;
+  white-space: nowrap;
+}
+.evo-item img {
+  width: 20px; height: 20px; image-rendering: pixelated;
+  vertical-align: middle;
+}
+
+/* Ficha de baya dentro del modal de objeto */
+.berry-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 7px; margin-bottom: 6px;
+}
+.berry-cell {
+  background: #111; border: 2px solid #2a2a2a; border-radius: 4px;
+  padding: 7px 10px; display: flex; flex-direction: column; gap: 2px;
+}
+.berry-cell span {
+  font-family: nintendo-DS; font-size: 10px;
+  color: rgba(255,248,231,0.45); letter-spacing: 1.5px;
+}
+.berry-cell b { font-size: 15px; color: var(--cream); font-weight: normal; }
+.berry-flavors { display: flex; flex-wrap: wrap; gap: 7px; }
+.berry-flavor {
+  display: inline-flex; align-items: center; gap: 7px;
+  border: 2px solid; border-radius: 4px; padding: 5px 11px;
+  font-size: 13px; letter-spacing: 0.5px;
+}
+.berry-flavor b { font-family: nintendo-DS; font-size: 14px; }
+.flavor-spicy  { color:#FF7B6B; border-color:#FF7B6B; background:rgba(255,123,107,0.09); }
+.flavor-dry    { color:#8FB8FF; border-color:#8FB8FF; background:rgba(143,184,255,0.09); }
+.flavor-sweet  { color:#FF9ED2; border-color:#FF9ED2; background:rgba(255,158,210,0.09); }
+.flavor-bitter { color:#7ED99B; border-color:#7ED99B; background:rgba(126,217,155,0.09); }
+.flavor-sour   { color:#F2E06B; border-color:#F2E06B; background:rgba(242,224,107,0.09); }
+.berry-nat { font-size: 14px; line-height: 1.7; color: rgba(255,248,231,0.75); margin: 0; }
+.berry-nat b { color: var(--yellow); }
+.berry-ok { color: #7ED99B; }
+.berry-no { color: #FF8888; }
+.pal-sprite.pal-item { image-rendering: pixelated; }
