@@ -2950,7 +2950,12 @@ async function nuzEnsurePool(version) {
       idbSet(KEY, { ts: Date.now(), data: pool });
     }
     nuzState.pools[version] = pool;
-  } catch { nuzState.pools[version] = {}; }
+  } catch {
+    // null = no se pudo cargar. Distinto de {} = cargado y sin encuentros.
+    // Antes se devolvía {} en ambos casos y la app culpaba a la API de un
+    // problema que era de conexión.
+    return null;
+  }
   return nuzState.pools[version];
 }
 
@@ -3184,10 +3189,20 @@ async function nuzRender() {
   }
   host.innerHTML = '<p class="nuz-loading">Cargando zonas del juego…</p>';
   const pool = await nuzEnsurePool(nuzVersion());
+  if (pool === null) {
+    host.innerHTML = `<p class="nuz-loading">No se pudieron cargar las zonas.
+      Revisa tu conexión e inténtalo otra vez.</p>`;
+    $("nuzSummary").innerHTML = "";
+    $("nuzPanels").innerHTML = "";
+    $("nuzTimeline").classList.add("hidden");
+    return;
+  }
   const zonas = Object.keys(pool);
   if (zonas.length === 0) {
     host.innerHTML = '<p class="nuz-loading">Este juego no tiene encuentros registrados en la API.</p>';
     $("nuzSummary").innerHTML = "";
+    $("nuzPanels").innerHTML = "";
+    $("nuzTimeline").classList.add("hidden");
     return;
   }
 

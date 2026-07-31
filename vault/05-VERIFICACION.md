@@ -118,6 +118,40 @@ Para localizarlo sin adivinar, recorre la cadena de ancestros imprimiendo
 `display`, `width`, `minWidth` y `gridTemplateColumns`. El síntoma es una
 columna más ancha que su propio contenedor.
 
+### Al probar sin conexión, comprueba que el dato NO estaba ya cacheado
+
+La caché es tan buena que invalida sus propias pruebas. Probando el Nuzlocke
+sin red, «funcionó» — pero porque el pool de Esmeralda ya estaba en IndexedDB
+de un test anterior. La prueba no medía nada.
+
+Antes de dar por válido un test offline, busca un recurso **que no esté
+cacheado**:
+
+```js
+const candidatos = ['platinum','crystal','soulsilver'];
+let limpio = null;
+for (const v of candidatos) if (!(await idbGet(`nuz:pool:${v}:v1`))) { limpio = v; break; }
+```
+
+Cortar la red para el código de la app:
+
+```js
+const real = window.fetch;
+window.fetch = () => Promise.reject(new TypeError('Failed to fetch'));
+// ...probar...
+window.fetch = real;
+```
+
+Ojo: esto **no** prueba el service worker (que intercepta la red real), solo la
+resiliencia del código de la app y la caché de IndexedDB.
+
+### Distingue «cargado y vacío» de «no se pudo cargar»
+
+Devolver `{}` en el `catch` hace que la app culpe a la API de un problema de
+conexión. El Nuzlocke decía «este juego no tiene encuentros registrados en la
+API» cuando lo que pasaba es que no había internet. Devuelve `null` en el
+fallo y `{}` en el vacío legítimo.
+
 ### Cuidado con las métricas propias
 
 El «108 selectores CSS duplicados» que reporté era un artefacto de mi propio

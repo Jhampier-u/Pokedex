@@ -8,30 +8,29 @@
 | | |
 |---|---|
 | Rama | `main`, sincronizada con `origin/main` |
-| Último trabajo | Barrido de diálogos bloqueantes y maquetación en móvil (`git log -1` para el hash) |
+| Último trabajo | Auditoría del funcionamiento sin conexión (`git log -1` para el hash) |
 | Árbol de trabajo | Limpio, todo pusheado |
 | Remoto | https://github.com/Jhampier-u/Pokedex |
 | Servidor local | `python -m http.server 5599` (ya está en `.claude/launch.json` como `pokedex-static`) |
 
 ## Qué se acaba de terminar
 
-Barrido a raíz del bug que reportó el usuario:
+**Auditoría offline.** Se había afirmado que la app funciona sin conexión sin
+haberlo comprobado nunca. Comprobado: catálogo, fichas visitadas, stats,
+naturalezas, tablas de tipos, Pokédex regionales y el shell salen todos de
+caché sin tocar la red.
 
-1. **Cero diálogos bloqueantes** en toda la app (quedaban dos `alert()` y un
-   `prompt()`); ahora todo va por `toast()`.
-2. **Fallos silenciosos con aviso**: `loadCenterDetail` se tragaba los errores
-   de red y dejaba la ficha del Pokémon anterior sin decir nada.
-3. **Maquetación en móvil**: la cadena evolutiva de Eevee era inalcanzable y
-   el análisis de equipo desbordaba 42px.
+De paso salió un bug: el Nuzlocke culpaba a la API («este juego no tiene
+encuentros registrados») de lo que era un problema de conexión.
 
 ## Qué toca ahora
 
-Nada empezado. El backlog de funciones está agotado y la app está auditada en
-móvil y escritorio.
+Nada empezado. El backlog está agotado y la app está auditada en móvil,
+escritorio y sin conexión.
 
-Si aparece algo, lo más probable es que salga **usándola**, no en pruebas por
-consola: los dos últimos bugs reales los encontró el usuario o una auditoría
-de maquetación, no las pruebas funcionales. Lee las trampas de
+Si aparece algo nuevo, probablemente salga **usándola** o auditando algo que
+se dio por bueno sin comprobar. Las tres últimas tandas de bugs salieron así,
+no de las pruebas funcionales. Lee las trampas de
 [`05-VERIFICACION.md`](05-VERIFICACION.md) antes de dar nada por verificado.
 
 ## Antes de tocar nada

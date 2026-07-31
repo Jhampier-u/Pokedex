@@ -302,6 +302,30 @@ sus propias tarjetas, sin contenido inalcanzable. Se dejan a propósito.
 Verificado en los 6 modos a 375px y en escritorio, con `alert`, `confirm` y
 `prompt` redefinidos para marcar fallo: no se usa ninguno.
 
+## Tanda 17 — Auditoría offline
+
+Se había afirmado en el README y en el vault que la app **funciona sin
+conexión**, y nunca se había comprobado. Se comprobó cortando `window.fetch`.
+
+**Lo que sí funciona** (todo servido desde IndexedDB, sin tocar la red):
+catálogo de 1025, fichas ya visitadas, los 1025 stats, las 25 naturalezas, las
+tablas de tipos históricas, las Pokédex regionales y el shell del service
+worker (`index.html`, `js/index.js`, `styles.css`).
+
+**Lo que falla, y ahora avisa bien:** un Pokémon nunca visitado no se puede
+cargar; la ficha muestra «No se pudieron cargar los datos de este Pokémon» y un
+aviso, en vez de quedarse con los datos del anterior.
+
+**Bug encontrado:** el Nuzlocke decía «Este juego no tiene encuentros
+registrados en la API» cuando lo que pasaba era que **no había internet**.
+`nuzEnsurePool` devolvía `{}` tanto si fallaba como si el juego estaba vacío.
+Ahora devuelve `null` al fallar, no lo cachea, y el mensaje culpa a la conexión
+y no a la API. Verificado que el reintento con red funciona sin recargar.
+
+**La primera versión de esta prueba no valía:** «funcionaba» sin red porque el
+dato ya estaba en IndexedDB de un test anterior. Hubo que buscar un juego sin
+cachear (Platino) para medir algo de verdad. Anotado en `05-VERIFICACION.md`.
+
 ## Correcciones a lo que dije por el camino
 
 Tres cosas que reporté mal y conviene no repetir:
