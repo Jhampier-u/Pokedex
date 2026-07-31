@@ -93,6 +93,25 @@ Verificado contra valores conocidos: Garchomp Adamant 252 EV nv.100 = **394**
 de Ataque, Blissey **651** PS, Vidasfera ×1.30, quemadura ×0.50, crítico ×1.50,
 lluvia ×0.50 sobre Fuego.
 
+## Tanda 8 — Modalidades del quiz
+
+El quiz solo tenía siluetas. Ahora hay cuatro modalidades y un contrarreloj:
+
+- **🖼 Silueta** — la de siempre.
+- **🔊 Grito** — reproduce el grito (`cries.latest`, ya se descargaba).
+- **📖 Descripción** — una entrada de Pokédex al azar, con el nombre del propio
+  Pokémon tapado con `???` (varias entradas se nombran a sí mismas).
+- **📊 Estadísticas** — las 6 stats en barras, sin decir de quién son.
+- **⏱ Contrarreloj** — 10 s por ronda; si se agota cuenta como fallo.
+
+Al responder siempre se revela el sprite, en cualquier modalidad, para que se
+aprenda. Las pistas que necesitan red llevan guard de secuencia (`quizRoundSeq`)
+para que una respuesta lenta no pise la ronda siguiente.
+
+Verificado: las 4 modalidades pintan su pista, Mewtwo sale como «??? fue creado
+por manipulación genética…», el temporizador agotado suma total y pone la racha
+a 0, y un acierto revela el sprite y oculta la pista.
+
 ## Correcciones a lo que dije por el camino
 
 Dos cosas que reporté mal y conviene no repetir:

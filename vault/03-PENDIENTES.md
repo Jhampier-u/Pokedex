@@ -4,26 +4,7 @@ Ordenado por retorno respecto al esfuerzo. Nada de esto está empezado.
 
 ---
 
-## 1. Quiz por grito y otras variantes · esfuerzo bajo
-
-El quiz solo tiene siluetas. Los **gritos ya se descargan** (`data.cries.latest`,
-lo usa el botón GRITO de la ficha), así que un modo «adivina por el grito» es
-casi gratis.
-
-Variantes que valdría la pena:
-- **Por grito** 🔊 — reproducir y adivinar.
-- **Por descripción** — mostrar una entrada de Pokédex, adivinar de quién es.
-  Los `flavor_text_entries` ya están en `speciesCache`.
-- **Por estadísticas** — mostrar el radar y adivinar. `statIndex` ya tiene los
-  1025.
-- **Temporizador / contrarreloj** con récord aparte.
-
-Dónde tocar: `initQuiz`, `newQuizRound`, `quizState` en `js/index.js`. Añadir un
-selector de modalidad junto al de dificultad.
-
----
-
-## 2. Números de dex regional · esfuerzo medio · **arregla un bug**
+## 1. Números de dex regional · esfuerzo medio · **arregla un bug**
 
 Ahora mismo la región se decide por **rango de ID** (`REGIONS` en la línea ~23),
 lo cual es incorrecto para formas regionales: un Vulpix de Alola es el ID 27 y
@@ -44,7 +25,7 @@ región y a la ruleta. No es un cambio de una línea.
 
 ---
 
-## 3. Tracker Nuzlocke · esfuerzo alto · el más ambicioso
+## 2. Tracker Nuzlocke · esfuerzo alto · el más ambicioso
 
 La ruleta ya es la semilla. Un tracker de verdad necesitaría:
 - Encuentros por ruta (`/location-area` da los encuentros reales por juego).
@@ -57,7 +38,7 @@ Es un proyecto en sí mismo. Merecería su propio modo.
 
 ---
 
-## 4. Paleta de comandos (Ctrl+K) · esfuerzo medio
+## 3. Paleta de comandos (Ctrl+K) · esfuerzo medio
 
 Buscador global unificado sobre Pokémon, movimientos, habilidades y objetos.
 La búsqueda difusa (`fuzzyScore`) ya existe y funciona bien; faltaría un índice
@@ -65,7 +46,7 @@ de movimientos/habilidades y el overlay.
 
 ---
 
-## 5. Deuda menor
+## 4. Deuda menor
 
 - **`detailCache` sin tope.** Ya no es agudo (con GraphQL no se descargan los
   1025 objetos completos), pero sigue creciendo sin límite mientras navegas.

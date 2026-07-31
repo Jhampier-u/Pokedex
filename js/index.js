@@ -2656,15 +2656,29 @@ function buildPicker(container, onSelect, opts = {}) {
 // ════════════════════════════════════════════════════════
 //  TOOL 1:  ¿QUIÉN ES ESE POKÉMON?
 // ════════════════════════════════════════════════════════
+const QUIZ_MODES = {
+  silueta:     { label: "🖼 Silueta",      hint: "¿Quién es ese Pokémon?" },
+  grito:       { label: "🔊 Grito",        hint: "¿De quién es este grito?" },
+  descripcion: { label: "📖 Descripción",  hint: "¿De quién habla esta entrada?" },
+  stats:       { label: "📊 Estadísticas", hint: "¿A quién pertenecen estos datos?" },
+};
+const QUIZ_SECONDS = 10;
+
 const quizState = {
   answer: null,
   options: [],
   done: false,
+  mode: "silueta",
+  timed: false,
+  timer: null, deadline: 0, raf: null,
   score: { correct: 0, total: 0, streak: 0, best: 0 },
 };
 
 function initQuiz() {
   TOOL_INITED.quiz = true;
+
+  $("quizMode").innerHTML = Object.entries(QUIZ_MODES)
+    .map(([k, v]) => `<option value="${k}">${v.label}</option>`).join("");
 
   // Restore best from localStorage
   try {
@@ -2675,7 +2689,39 @@ function initQuiz() {
 
   $("quizNext").addEventListener("click", newQuizRound);
   $("quizDifficulty").addEventListener("change", newQuizRound);
+  $("quizMode").addEventListener("change", e => {
+    quizState.mode = e.target.value;
+    newQuizRound();
+  });
+  $("quizTimed").addEventListener("change", e => {
+    quizState.timed = e.target.checked;
+    newQuizRound();
+  });
   newQuizRound();
+}
+
+// ── Temporizador del modo contrarreloj ───────────────────
+function stopQuizTimer() {
+  if (quizState.timer) { clearTimeout(quizState.timer); quizState.timer = null; }
+  if (quizState.raf)   { cancelAnimationFrame(quizState.raf); quizState.raf = null; }
+  $("quizTimer").classList.add("hidden");
+}
+function startQuizTimer() {
+  stopQuizTimer();
+  if (!quizState.timed) return;
+  const bar = $("quizTimerFill");
+  $("quizTimer").classList.remove("hidden");
+  quizState.deadline = performance.now() + QUIZ_SECONDS * 1000;
+  const tick = () => {
+    const left = Math.max(0, quizState.deadline - performance.now());
+    bar.style.width = (left / (QUIZ_SECONDS * 1000) * 100) + "%";
+    bar.classList.toggle("urgent", left < 3000);
+    if (left > 0 && !quizState.done) quizState.raf = requestAnimationFrame(tick);
+  };
+  tick();
+  // Se acabó el tiempo: cuenta como fallo
+  quizState.timer = setTimeout(() => { if (!quizState.done) answerQuiz(null); },
+                               QUIZ_SECONDS * 1000);
 }
 
 function quizPool() {
@@ -2685,14 +2731,16 @@ function quizPool() {
   return state.allPokemon;
 }
 
-function newQuizRound() {
+async function newQuizRound() {
+  stopQuizTimer();
   quizState.done = false;
   $("quizNext").classList.add("hidden");
   $("quizPrompt").className = "quiz-prompt";
-  $("quizPrompt").textContent = "¿Quién es ese Pokémon?";
+  $("quizPrompt").textContent = QUIZ_MODES[quizState.mode]?.hint || "¿Quién es ese Pokémon?";
   $("quizSilhouette").classList.remove("revealed");
 
   const pool = quizPool();
+  if (pool.length < 4) return;
   const target = pool[Math.floor(Math.random() * pool.length)];
   quizState.answer = target;
 
@@ -2722,12 +2770,96 @@ function newQuizRound() {
     btn.addEventListener("click", () => answerQuiz(opt));
     opts.appendChild(btn);
   });
+
+  const seq = ++quizRoundSeq;
+  await renderQuizHint(target, seq);
+  if (seq === quizRoundSeq && !quizState.done) startQuizTimer();
 }
 
+// Las pistas de grito/descripción/stats necesitan una petición; si el usuario
+// pasa de ronda antes de que llegue, esta secuencia descarta la respuesta vieja.
+let quizRoundSeq = 0;
+
+async function renderQuizHint(target, seq) {
+  const alt  = $("quizAlt");
+  const sil  = $("quizSilhouette");
+  const mode = quizState.mode;
+
+  // La silueta solo se ve en su modo; en el resto se revela al responder
+  sil.classList.toggle("hidden", mode !== "silueta");
+  alt.classList.toggle("hidden", mode === "silueta");
+  if (mode === "silueta") { alt.innerHTML = ""; return; }
+
+  alt.innerHTML = '<div class="quiz-alt-loading">Cargando pista…</div>';
+
+  try {
+    if (mode === "grito") {
+      const data = await fetchPokemonByName(target.id);
+      if (seq !== quizRoundSeq) return;
+      const url = data.cries?.latest || data.cries?.legacy;
+      if (!url) { alt.innerHTML = '<div class="quiz-alt-loading">Sin grito disponible.</div>'; return; }
+      alt.innerHTML = `<button class="quiz-cry" id="quizCryBtn">🔊<span>REPRODUCIR</span></button>`;
+      const play = () => {
+        if (quizCryAudio) { quizCryAudio.pause(); }
+        quizCryAudio = new Audio(url);
+        quizCryAudio.volume = 0.35;
+        quizCryAudio.play().catch(() => {});
+      };
+      $("quizCryBtn").addEventListener("click", play);
+      play();   // suena una vez al empezar la ronda
+
+    } else if (mode === "descripcion") {
+      const data = await fetchPokemonByName(target.id);
+      const sd   = await apiFetch(data.species.url);
+      if (seq !== quizRoundSeq) return;
+      let ents = sd.flavor_text_entries.filter(e => e.language.name === "es");
+      if (ents.length === 0) ents = sd.flavor_text_entries.filter(e => e.language.name === "en");
+      if (ents.length === 0) { alt.innerHTML = '<div class="quiz-alt-loading">Sin entrada disponible.</div>'; return; }
+      const pick = ents[Math.floor(Math.random() * ents.length)];
+      // Algunas entradas nombran al propio Pokémon: hay que taparlo
+      const oculto = pick.flavor_text.replace(/[\n\f\r]+/g, " ")
+        .replace(new RegExp(target.name, "gi"), "???")
+        .replace(new RegExp(sd.name, "gi"), "???");
+      alt.innerHTML = `
+        <div class="quiz-desc">
+          <span class="quiz-desc-ver">${prettyVersion(pick.version.name)}</span>
+          <p>${oculto}</p>
+        </div>`;
+
+    } else if (mode === "stats") {
+      let rec = state.statIndex[target.id];
+      if (!rec) {
+        const data = await fetchPokemonByName(target.id);
+        pdexIndexStats(data);
+        rec = state.statIndex[target.id];
+      }
+      if (seq !== quizRoundSeq) return;
+      alt.innerHTML = `
+        <div class="quiz-stats">
+          ${STAT_ORDER.map(k => `
+            <div class="qs-row">
+              <span class="qs-name">${STAT_NAMES[k]}</span>
+              <div class="qs-bar"><div class="qs-fill ${STAT_CLASS[k]}"
+                   style="width:${Math.min(100, (rec[k] / 255) * 100)}%"></div></div>
+              <span class="qs-num">${rec[k]}</span>
+            </div>`).join("")}
+          <div class="qs-bst">TOTAL <b>${rec.bst}</b></div>
+        </div>`;
+    }
+  } catch {
+    if (seq === quizRoundSeq) {
+      alt.innerHTML = '<div class="quiz-alt-loading">No se pudo cargar la pista.</div>';
+    }
+  }
+}
+let quizCryAudio = null;
+
+// picked === null → se acabó el tiempo en modo contrarreloj
 function answerQuiz(picked) {
   if (quizState.done) return;
   quizState.done = true;
-  const correct = picked.id === quizState.answer.id;
+  stopQuizTimer();
+  const correct = !!picked && picked.id === quizState.answer.id;
   quizState.score.total++;
   if (correct) {
     quizState.score.correct++;
@@ -2745,14 +2877,17 @@ function answerQuiz(picked) {
   $("quizStreak").textContent  = quizState.score.streak;
   $("quizBest").textContent    = quizState.score.best;
 
-  // Reveal silhouette
-  $("quizSilhouette").classList.add("revealed");
+  // Al responder siempre se enseña el Pokémon, en cualquier modalidad
+  const sil = $("quizSilhouette");
+  sil.classList.remove("hidden");
+  sil.classList.add("revealed");
+  $("quizAlt").classList.add("hidden");
 
   // Mark options
   document.querySelectorAll(".quiz-opt").forEach(b => {
     b.disabled = true;
     if (b.textContent === quizState.answer.name) b.classList.add("correct");
-    else if (b.textContent === picked.name)      b.classList.add("wrong");
+    else if (picked && b.textContent === picked.name) b.classList.add("wrong");
   });
 
   // Prompt
@@ -2760,6 +2895,9 @@ function answerQuiz(picked) {
   if (correct) {
     prompt.textContent = `✓  ¡Es ${quizState.answer.name.toUpperCase()}!`;
     prompt.className = "quiz-prompt correct";
+  } else if (!picked) {
+    prompt.textContent = `⏱  ¡Tiempo! Era ${quizState.answer.name.toUpperCase()}`;
+    prompt.className = "quiz-prompt wrong";
   } else {
     prompt.textContent = `✗  Era ${quizState.answer.name.toUpperCase()}`;
     prompt.className = "quiz-prompt wrong";

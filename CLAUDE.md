@@ -21,7 +21,10 @@ corresponda a lo que vayas a tocar:
 **Después de cada cambio o flujo de trabajo, actualiza el vault** antes de dar
 la tarea por cerrada. Como mínimo:
 
-1. `00-ESTADO-ACTUAL.md` — commit nuevo, qué se acaba de terminar, qué sigue
+1. `00-ESTADO-ACTUAL.md` — qué se acaba de terminar y qué sigue. **No apuntes
+   ahí el hash del commit que estás a punto de hacer**: es circular, un commit
+   no puede contener su propio hash. Describe el trabajo; el hash lo da
+   `git log -1`.
 2. `02-HISTORIAL.md` — una entrada con qué se hizo y qué se verificó
 3. `03-PENDIENTES.md` — quitar lo hecho, añadir lo que haya surgido
 4. `04-DECISIONES.md` — si tomaste una decisión no obvia, escribe el porqué

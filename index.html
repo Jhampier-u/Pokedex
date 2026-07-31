@@ -350,17 +350,30 @@
             <div class="quiz-silhouette" id="quizSilhouette">
               <img id="quizImg" alt=""/>
             </div>
+            <!-- Pista alternativa según el modo: grito, descripción o stats -->
+            <div class="quiz-alt hidden" id="quizAlt"></div>
+          </div>
+          <div class="quiz-timer hidden" id="quizTimer">
+            <div class="qt-fill" id="quizTimerFill"></div>
           </div>
           <div class="quiz-prompt" id="quizPrompt">¡Adivina!</div>
           <div class="quiz-options" id="quizOptions"></div>
           <button class="quiz-next hidden" id="quizNext">▶ SIGUIENTE</button>
           <div class="quiz-difficulty">
-            <label>Dificultad:</label>
-            <select id="quizDifficulty">
-              <option value="kanto">Kanto (fácil)</option>
-              <option value="gen5">Gen I-V (medio)</option>
-              <option value="all" selected>Todos (difícil)</option>
-            </select>
+            <label>Modo:
+              <select id="quizMode"></select>
+            </label>
+            <label>Dificultad:
+              <select id="quizDifficulty">
+                <option value="kanto">Kanto (fácil)</option>
+                <option value="gen5">Gen I-V (medio)</option>
+                <option value="all" selected>Todos (difícil)</option>
+              </select>
+            </label>
+            <label class="quiz-check">
+              <input type="checkbox" id="quizTimed"/>
+              <span>⏱ Contrarreloj (10 s)</span>
+            </label>
           </div>
         </div>
       </section>

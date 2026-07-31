@@ -8,24 +8,23 @@
 | | |
 |---|---|
 | Rama | `main`, sincronizada con `origin/main` |
-| Último commit | `62f8817` — Simulador de batalla completo |
+| Último trabajo | Modalidades del quiz (`git log -1` para el hash) |
 | Árbol de trabajo | Limpio, todo pusheado |
 | Remoto | https://github.com/Jhampier-u/Pokedex |
 | Servidor local | `python -m http.server 5599` (ya está en `.claude/launch.json` como `pokedex-static`) |
 
 ## Qué se acaba de terminar
 
-El **simulador de batalla completo** (commit `62f8817`): naturaleza, EVs/IVs,
-objeto, estado, clima, crítico, multigolpe, drenaje, prioridad, y un veredicto
-que calcula turnos hasta el K.O. en vez de puntuar por heurística.
+Las **modalidades del quiz**: además de la silueta, ahora se puede adivinar por
+grito, por entrada de Pokédex o por estadísticas, con un modo contrarreloj de
+10 segundos.
 
 ## Qué toca ahora
 
 Nada empezado. Lo siguiente por prioridad está en
-[`03-PENDIENTES.md`](03-PENDIENTES.md). El candidato más barato y con mejor
-retorno es el **quiz por grito** (los `cries` ya se descargan), y el más útil
-de fondo es el **dex regional** (`/pokedex`), que arregla de paso el bug de las
-formas regionales.
+[`03-PENDIENTES.md`](03-PENDIENTES.md). El primero es el **dex regional**
+(`/pokedex`), que además arregla el bug de las formas regionales: hoy la región
+se decide por rango de ID y un Vulpix de Alola cae en «Kanto».
 
 ## Antes de tocar nada
 
