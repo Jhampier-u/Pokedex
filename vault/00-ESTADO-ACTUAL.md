@@ -8,7 +8,7 @@
 | | |
 |---|---|
 | Rama | `main`, sincronizada con `origin/main` |
-| Último trabajo | Accesibilidad de teclado y auditoría de tablet (`git log -1` para el hash) |
+| Último trabajo | Iconos de la PWA regenerados (`git log -1` para el hash) |
 | Árbol de trabajo | Limpio, todo pusheado |
 | Remoto | https://github.com/Jhampier-u/Pokedex |
 | Desplegado | https://jhampier-u.github.io/Pokedex/ (GitHub Pages, verificado) |
@@ -16,22 +16,19 @@
 
 ## Qué se acaba de terminar
 
-**Accesibilidad de teclado.** La Tanda 6 añadió roles ARIA pero nunca se
-recorrió la app con el teclado. Al hacerlo: 28 elementos con clic eran
-inalcanzables (movimientos, habilidades y cadena evolutiva) y **no había
-ningún indicador de foco visible**. Ambas cosas arregladas.
-
-Tablet (768px) auditado: limpio.
+**Iconos de la PWA.** Al hacer el icono adaptativo se descubrió que el original
+no era transparente: tenía el tablero de cuadros pegado en la imagen. Se limpió
+y se generaron cuatro iconos (`any` y `maskable`, 192 y 512), con la zona
+segura **medida**. Borrado también `Tareas Por Hacer.txt`.
 
 ## Qué toca ahora
 
-Nada empezado. La app está auditada en móvil, tablet, escritorio, sin conexión
-y con teclado.
+Nada empezado. El backlog está agotado: la app está auditada en móvil, tablet,
+escritorio, sin conexión y con teclado, y el despliegue en GitHub Pages está
+verificado.
 
-Si aparece algo nuevo, lo más probable es que salga **usándola** o auditando
-algo que se dio por bueno. Cuatro tandas seguidas de bugs han salido así y
-ninguno de las pruebas funcionales. Lee las trampas de
-[`05-VERIFICACION.md`](05-VERIFICACION.md) antes de dar nada por verificado.
+Lo que queda en [`03-PENDIENTES.md`](03-PENDIENTES.md) son ideas opcionales que
+nadie echa de menos. Lo más útil es **usarla**.
 
 ## Antes de tocar nada
 

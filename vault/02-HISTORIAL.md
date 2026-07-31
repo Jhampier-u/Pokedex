@@ -377,6 +377,37 @@ arriba y por la izquierda. Por eso **no debe declararse `purpose: "maskable"`**
 —Android lo recorta en círculo y se comería el borde del icono—. Para tener
 icono adaptativo haría falta una versión con el 20% de zona segura.
 
+## Tanda 19 — Iconos de la PWA (y un hallazgo sobre el original)
+
+Al preparar el icono adaptativo salió que **el archivo original no era
+transparente**: `Pokeball_PixelArt_Transparent.png` tenía **el tablero de
+cuadros de transparencia pegado en la imagen**, opaco al 100%. Es decir, el
+favicon y el icono de la PWA mostraban un fondo de cuadros grises.
+
+Mi diagnóstico anterior («el contenido ocupa el 100% del lienzo») era correcto
+pero por la razón equivocada: no es que la Pokéball llegara al borde, es que
+había un fondo pintado.
+
+Proceso: relleno por inundación desde los bordes para quitar los cuadros
+(se detiene en el contorno oscuro de la bola), filtrado de 1554 componentes
+pequeños de menos de 3000 px que quedaban como motas por el ruido de
+compresión, y recorte de la sombra usando el perfil de anchura por fila
+(la bola acaba en y=876, la sombra va de 880 a 940).
+
+Resultado: cuatro iconos generados y **medidos**, no supuestos.
+
+| Icono | Uso | Contenido |
+|---|---|---|
+| `icon-192/512.png` | `purpose: any`, transparente | 48,8% del lienzo |
+| `icon-maskable-192/512.png` | `purpose: maskable`, fondo `#0a0a0a` | 34,9% (límite 40%) |
+
+El criterio para maskable es que el píxel opaco más lejano del centro quede
+dentro del 40% del lienzo, que es lo que sobrevive al recorte circular de
+Android. Se comprueba con el mismo script que detectó el problema.
+
+También: `sw.js` pasa a `VERSION v2` para invalidar la caché vieja, y se borró
+`Tareas Por Hacer.txt`, obsoleto desde que existen el README y el vault.
+
 ## Correcciones a lo que dije por el camino
 
 Tres cosas que reporté mal y conviene no repetir:

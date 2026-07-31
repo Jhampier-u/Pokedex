@@ -18,15 +18,8 @@ Fases 1 y 2 hechas. Ideas que quedaron fuera:
 
 ## 2. Deuda menor
 
-- **`Tareas Por Hacer.txt`** está obsoleto: todo marcado como hecho y ya no
-  refleja el proyecto. Su contenido lo cubre el README. **Pendiente de que el
-  usuario decida si se borra** — no borrar sin preguntar.
 - **`applyFilters` con `resetIndex`** al cargar stats: ya se arregló, pero hay
   otros sitios que resetean posición y convendría revisarlos si molesta.
-- **Icono adaptativo para Android.** El icono actual (1024×1024) tiene el
-  contenido pegado al borde: 0% de margen. No se puede declarar
-  `purpose: "maskable"` sin que Android le recorte el borde. Haría falta una
-  versión con ~20% de zona segura alrededor. Cosmético.
 
 ---
 

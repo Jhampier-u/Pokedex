@@ -9,7 +9,7 @@
 //   · Sprites y respuestas de PokéAPI → cache-first. Son inmutables, así que
 //     una vez descargados no vuelve a hacer falta la red.
 // ════════════════════════════════════════════════════════
-const VERSION     = "v1";
+const VERSION     = "v2";
 const SHELL_CACHE = `pokedex-shell-${VERSION}`;
 const ASSET_CACHE = `pokedex-assets-${VERSION}`;
 
@@ -19,7 +19,10 @@ const SHELL = [
   "./styles.css",
   "./js/index.js",
   "./manifest.webmanifest",
-  "./Pokeball_PixelArt_Transparent.png",
+  "./icon-192.png",
+  "./icon-512.png",
+  "./icon-maskable-192.png",
+  "./icon-maskable-512.png",
   "./fonts/Nintendo-DS-BIOS.ttf",
   "./fonts/Pokemon Hollow.ttf",
   "./fonts/Pokemon Solid.ttf",
