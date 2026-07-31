@@ -1015,6 +1015,8 @@ function renderAll(data, species) {
   renderAbilities(data.abilities);
   renderStats(data.stats);
   renderBreeding(species);
+  renderCaptureBalls(species, types);
+  renderHeldItems(data);
   renderDexNumbers(species);
   renderMoves(data);
   renderWeaknesses(types);
@@ -1149,6 +1151,118 @@ function renderStats(stats) {
     });
   });
 }
+// ── Objetos: sprite, nombre en español y ficha ──────────
+const ITEM_SPRITE = n =>
+  `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${n}.png`;
+
+async function fetchItem(name) {
+  state.itemCache ||= {};
+  if (state.itemCache[name]) return state.itemCache[name];
+  const data = await apiFetch(`https://pokeapi.co/api/v2/item/${name}`);
+  state.itemCache[name] = data;
+  return data;
+}
+const itemNameEs = d => d.names.find(n => n.language.name === "es")?.name || prettyName(d.name);
+function itemTextEs(d) {
+  // Se coge la ÚLTIMA entrada: las primeras son de juegos antiguos y en la API
+  // hay objetos cuyo primer texto está descolocado.
+  const es = d.flavor_text_entries.filter(e => e.language.name === "es");
+  const en = d.flavor_text_entries.filter(e => e.language.name === "en");
+  const pick = es[es.length - 1] || en[en.length - 1];
+  return pick ? pick.text.replace(/[\n\f\r]+/g, " ") : "Sin descripción.";
+}
+
+async function openItemModal(name) {
+  openModal();
+  let d;
+  try { d = await fetchItem(name); }
+  catch {
+    modalContent.innerHTML = `<p style="padding:20px;color:#ff8888">Error al cargar el objeto.</p>`;
+    modalLoading.classList.add("hidden"); modalContent.classList.remove("hidden");
+    return;
+  }
+  modalContent.innerHTML = `
+    <div class="modal-title">${itemNameEs(d)}</div>
+    <div class="modal-meta-row">
+      <img class="modal-item-sprite" src="${d.sprites?.default || ITEM_SPRITE(d.name)}" alt=""/>
+      <span class="modal-cat">${prettyName(d.category?.name || "objeto")}</span>
+      ${d.cost ? `<span class="modal-cat">${d.cost} ₽</span>` : ""}
+    </div>
+    <div class="modal-section-title">◆ DESCRIPCIÓN</div>
+    <div class="modal-description">${itemTextEs(d)}</div>`;
+  modalLoading.classList.add("hidden");
+  modalContent.classList.remove("hidden");
+}
+
+function renderHeldItems(data) {
+  const block = $("heldItemsBlock"), host = $("heldItems");
+  if (!block || !host) return;
+  const items = data.held_items || [];
+  if (items.length === 0) { block.classList.add("hidden"); host.innerHTML = ""; return; }
+  block.classList.remove("hidden");
+  host.innerHTML = items.map(h => {
+    // La rareza cambia según el juego; se muestra la del más reciente
+    const vd = h.version_details || [];
+    const rareza = vd.length ? vd[vd.length - 1].rarity : null;
+    return `
+      <button class="held-item" data-item="${h.item.name}" title="Ver ficha del objeto">
+        <img src="${ITEM_SPRITE(h.item.name)}" alt="" loading="lazy"/>
+        <span class="hi-nombre">${prettyName(h.item.name)}</span>
+        ${rareza != null ? `<span class="hi-rareza">${rareza}%</span>` : ""}
+      </button>`;
+  }).join("");
+  host.querySelectorAll(".held-item").forEach(b =>
+    b.addEventListener("click", () => openItemModal(b.dataset.item)));
+  // El nombre en español llega después (una petición por objeto, cacheada)
+  items.forEach(async h => {
+    try {
+      const d = await fetchItem(h.item.name);
+      const el = host.querySelector(`.held-item[data-item="${h.item.name}"] .hi-nombre`);
+      if (el) el.textContent = itemNameEs(d);
+    } catch {}
+  });
+}
+
+// Multiplicadores de Pokéball: la API los describe en prosa («Success rate is
+// 2×») y no como dato, así que esta tabla está curada a mano, igual que la de
+// objetos de combate. Ver 04-DECISIONES.md.
+const CAPTURE_BALLS = [
+  { id:"poke-ball",   mult:1 },
+  { id:"great-ball",  mult:1.5 },
+  { id:"ultra-ball",  mult:2 },
+  { id:"quick-ball",  mult:5,   nota:"1.er turno" },
+  { id:"timer-ball",  mult:4,   nota:"turno 10+" },
+  { id:"repeat-ball", mult:3.5, nota:"ya capturado" },
+  { id:"net-ball",    mult:3.5, nota:"Agua o Bicho", tipos:["water","bug"] },
+  { id:"dusk-ball",   mult:3,   nota:"noche o cueva" },
+  { id:"dive-ball",   mult:3.5, nota:"pescando" },
+  { id:"master-ball", mult:Infinity },
+];
+
+function renderCaptureBalls(species, types) {
+  const host = $("ballGrid");
+  if (!host) return;
+  if (species.captureRate == null) { host.innerHTML = ""; return; }
+  const tn = types.map(t => t.type.name);
+  host.innerHTML =
+    `<div class="ball-head">Probabilidad por Pokéball · a PS máximo y sin estado alterado</div>` +
+    CAPTURE_BALLS.map(b => {
+      // Las condicionadas por tipo se calculan con los tipos reales del Pokémon
+      const aplica = !b.tipos || b.tipos.some(t => tn.includes(t));
+      const mult = aplica ? b.mult : 1;
+      const pct  = mult === Infinity ? 100 : captureChance(species.captureRate * mult);
+      return `
+        <button class="ball-cell${aplica ? "" : " ball-off"}" data-item="${b.id}"
+                title="Ver ficha de esta Pokéball">
+          <img src="${ITEM_SPRITE(b.id)}" alt="" loading="lazy"/>
+          <span class="ball-pct">${pct.toFixed(0)}%</span>
+          ${b.nota ? `<span class="ball-nota">${aplica ? b.nota : "no aplica"}</span>` : ""}
+        </button>`;
+    }).join("");
+  host.querySelectorAll(".ball-cell").forEach(b =>
+    b.addEventListener("click", () => openItemModal(b.dataset.item)));
+}
+
 // ── Números de Pokédex regional ─────────────────────────
 // Ojo: esto NO es lo mismo que la región de las pestañas. Esas filtran por
 // generación de origen (Vulpix es de gen I, luego Kanto), mientras que aquí se

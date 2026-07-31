@@ -436,6 +436,36 @@ Curiosidad comprobada: el repositorio tiene sprites estilo Negro/Blanco para
 Pokémon de Gen IX (Ogerpon incluido) y **cargan de verdad**. Es dato real de la
 API, así que se muestran.
 
+## Tanda 21 — Objetos: los que lleva y captura por Pokéball
+
+De la conversación sobre si convertir esto en un catálogo de objetos, se
+hicieron las dos conexiones que aprovechan lo que ya existe, y **no** el
+catálogo de 2180 objetos (razones en `03-PENDIENTES.md`).
+
+**Objetos que lleva en salvaje.** `data.held_items` ya venía en la respuesta de
+`/pokemon` y se tiraba. Chansey: Piedra Oval 50%, Huevo Suerte 5%, Puño Suerte
+100%. La rareza se toma del juego más reciente. El nombre en español llega
+después con una petición por objeto, cacheada; hasta entonces se ve el nombre
+en inglés formateado.
+
+**Captura por Pokéball.** La ficha ya calculaba «≈35% con Poké Ball»; ahora hay
+una rejilla con 10 balls y su probabilidad real para *ese* Pokémon. Las
+condicionadas por tipo se resuelven con los tipos reales: la Malla Ball se
+marca «no aplica» en Chansey (Normal) y sí cuenta en Magikarp (Agua).
+
+Comprobado contra la fórmula: Magikarp (ratio 255) sale 44% con Poké Ball y
+100% con Malla; Chansey (ratio 30), 9% y 29% con Ball Rápida.
+
+Los multiplicadores de ball están **curados a mano**, como los de combate: la
+API los describe en prosa («Success rate is 2×») y no como dato.
+
+**Ficha de objeto** reutilizando el modal de movimientos y habilidades, con
+sprite, categoría, precio y descripción en español.
+
+Detalle: se coge la **última** entrada de `flavor_text_entries`, no la primera.
+Con la primera, «Restos» mostraba la descripción del Pañuelo Seda; hay objetos
+con los textos descolocados en la API.
+
 ## Correcciones a lo que dije por el camino
 
 Tres cosas que reporté mal y conviene no repetir:

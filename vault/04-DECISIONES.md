@@ -50,6 +50,10 @@ Es el mismo tipo de lista hardcodeada que se eliminó con los legendarios; la
 diferencia es que allí la API sí tenía el dato. **Si aparece una fuente mejor,
 esto debería salir.**
 
+Lo mismo vale para `CAPTURE_BALLS`, los multiplicadores de Pokéball: la Ultra
+Ball dice «Success rate is 2×» en prosa y solo en inglés. Lo que **sí** sale de
+la API es la lista de balls, sus sprites, nombres en español y descripciones.
+
 ---
 
 ### La región tiene un único control: los tabs

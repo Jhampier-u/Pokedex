@@ -8,7 +8,7 @@
 | | |
 |---|---|
 | Rama | `main`, sincronizada con `origin/main` |
-| Último trabajo | Galería de sprites por juegos (`git log -1` para el hash) |
+| Último trabajo | Objetos que lleva y captura por Pokéball (`git log -1` para el hash) |
 | Árbol de trabajo | Limpio, todo pusheado |
 | Remoto | https://github.com/Jhampier-u/Pokedex |
 | Desplegado | https://jhampier-u.github.io/Pokedex/ (GitHub Pages, verificado) |
@@ -16,20 +16,18 @@
 
 ## Qué se acaba de terminar
 
-**Galería de sprites.** Pulsando el sprite de la ficha se abre la historia
-completa del Pokémon: Bulbasaur tiene 79 sprites en 23 juegos. Sale de
-`data.sprites.versions`, que ya se descargaba, así que son 0 peticiones nuevas.
+**Objetos, pero solo las conexiones útiles**, no un catálogo suelto:
 
-La tarjeta y el carrusel muestran **siempre el aspecto actual**: el modo
-generación cambia reglas, no apariencia. (Primero se hizo al revés y el
-usuario pidió el cambio; ver Tanda 20.)
+1. **Objetos que lleva en salvaje** con su rareza (dato que ya se descargaba).
+2. **Captura por Pokéball**: 10 balls con su probabilidad real para ese
+   Pokémon, resolviendo las condicionadas por tipo.
+3. Ficha de objeto en el modal, con sprite y descripción en español.
 
 ## Qué toca ahora
 
-Nada empezado. Sobre la mesa quedan, de la conversación sobre objetos:
-mostrar los que lleva en salvaje (`held_items`, ya descargado) y las Pokéballs
-en la calculadora de captura. Ver la nota final de
-[`03-PENDIENTES.md`](03-PENDIENTES.md).
+Nada empezado. De la lista de objetos quedarían los sprites de objeto en la
+cadena evolutiva (ahora «Piedra Fuego» es solo texto) y una sección de bayas,
+ambas opcionales. Ver [`03-PENDIENTES.md`](03-PENDIENTES.md).
 
 ## Antes de tocar nada
 
