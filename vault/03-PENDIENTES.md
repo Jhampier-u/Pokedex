@@ -26,16 +26,20 @@ tercer control parecido puede volver a liar las cosas (ya pasó una vez, ver
 
 ---
 
-## 2. Tracker Nuzlocke · esfuerzo alto · el más ambicioso
+## 2. Nuzlocke: fase 2 · esfuerzo medio
 
-La ruleta ya es la semilla. Un tracker de verdad necesitaría:
-- Encuentros por ruta (`/location-area` da los encuentros reales por juego).
-- Registro de capturas, muertes y apodos.
-- Reglas configurables (solo el primer encuentro, muerte permanente…).
-- Línea temporal del run y estado del equipo.
-- Persistencia y export/import (ya hay infraestructura en el chip «⇄ Datos»).
+La fase 1 ya está (modo propio, encuentros reales, apodos, estados, reglas,
+persistencia y export/import). Lo que se podría añadir:
 
-Es un proyecto en sí mismo. Merecería su propio modo.
+- **Orden de juego** de las zonas. Ahora salen alfabéticas; lo suyo sería el
+  orden en que las visitas. La API no da ese orden, habría que derivarlo del
+  número de ruta o mantener una lista por región.
+- **Más reglas**: solo el primer encuentro (bloquear el dado tras fallar),
+  nivel máximo por medalla, modo «solo un tipo».
+- **Equipo activo** con los 6 en estado `team`, enlazando al constructor de
+  equipo para ver su cobertura.
+- **Línea temporal** del run: qué cayó y cuándo.
+- **Cementerio** como vista aparte.
 
 ---
 

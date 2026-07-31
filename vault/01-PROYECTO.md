@@ -9,7 +9,7 @@ Idioma de la interfaz, comentarios y commits: **español**.
 ## Archivos
 
 ```
-index.html               ~600 líneas  Estructura y los 5 modos
+index.html               ~650 líneas  Estructura y los 6 modos
 styles.css              ~3300 líneas  Todos los estilos
 js/index.js             ~3600 líneas  Toda la lógica
 sw.js                                 Service worker (offline)
@@ -21,7 +21,7 @@ vault/                                Este contexto
 
 Un solo archivo JS a propósito, sin módulos ES: la app se sirve como estático
 puro y `<script defer>` basta. Si algún día crece más, el corte natural sería
-por modo (pokedex / duel / team / quiz / roulette).
+por modo (pokedex / duel / team / quiz / roulette / nuzlocke).
 
 ## Arquitectura
 
@@ -35,14 +35,14 @@ state = {
   detailCache, speciesCache, evoCache, moveCache, abilityCache, locationCache,
   statIndex,                         // stats de los 1025 para el filtro
   shinyMode, animatedMode, musicOn,
-  mode,        // pokedex | quiz | duel | team | roulette
+  mode,        // pokedex | quiz | duel | team | roulette | nuzlocke
   gen,         // reglas activas: 9 = actuales
   region,      // filtro de región; "" = todo. Su ÚNICO control son los tabs
 }
 ```
 
 Además: `PDEX` (favoritos, capturados, notas, recientes), `pdexUI`,
-`duelState`, `teamState`, `quizState`, `moveset`.
+`duelState`, `teamState`, `quizState`, `nuzState`, `moveset`.
 
 ### Red y caché — tres capas
 
@@ -50,12 +50,13 @@ Además: `PDEX` (favoritos, capturados, notas, recientes), `pdexUI`,
    IndexedDB (TTL 30 días); si hay acierto no toca la red. Además deduplica
    peticiones en vuelo: dos sitios pidiendo lo mismo comparten una llamada.
 2. **GraphQL** (`beta.pokeapi.co/graphql/v1beta`) para cargas masivas: stats de
-   los 1025, flags de legendario y las 25 naturalezas. Una petición cada una.
+   los 1025, flags de legendario, las 25 naturalezas y los encuentros por zona
+   de cada juego. Una petición cada una.
 3. **Service worker** — `network-first` para los archivos de la app,
    `cache-first` para sprites y respuestas de API.
 
 **Nunca uses `fetch()` directo contra PokéAPI.** Usa `apiFetch`. Las únicas
-excepciones legítimas son las tres consultas GraphQL, que son POST.
+excepciones legítimas son las consultas GraphQL, que son POST.
 
 ### Piezas clave
 
@@ -72,18 +73,19 @@ excepciones legítimas son las tres consultas GraphQL, que son POST.
 
 ### Modos
 
-Cinco vistas conmutadas por `switchMode(mode)`, que es **async**: espera a
+Seis vistas conmutadas por `switchMode(mode)`, que es **async**: espera a
 `catalogReady` antes de inicializar cualquier modo que dependa del catálogo.
 Los atajos de teclado solo actúan si `state.mode === "pokedex"`.
 
 ### Persistencia del usuario
 
 `localStorage`: `pdex_favs`, `pdex_caught`, `pdex_notes`, `pdex_recent`,
-`poketeam`, `pokequiz_best`. Exportable/importable en JSON desde el chip
+`poketeam`, `pokequiz_best`, `pokenuz`. Exportable/importable en JSON desde el chip
 «⇄ Datos».
 
 `IndexedDB` (`pokedex-cache` / store `api`): respuestas de la API, más las
-claves especiales `stats:all:v1`, `species:flags:v1`, `natures:v1`.
+claves especiales `stats:all:v1`, `species:flags:v1`, `natures:v1`,
+`nuz:versions:v1` y `nuz:pool:{version}:v1`.
 
 ## Convenciones
 

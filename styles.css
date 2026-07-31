@@ -2637,6 +2637,122 @@ kbd {
 }
 
 /* ══════════════════════════════════════
+   TRACKER NUZLOCKE
+══════════════════════════════════════ */
+.nuz-wrap { max-width: 1100px; margin: 30px auto; padding: 0 20px; }
+.nuz-config {
+  display: flex; flex-wrap: wrap; align-items: flex-end; gap: 16px;
+  background: #111; border: 3px solid var(--darker); border-radius: 10px;
+  padding: 16px 18px; margin-bottom: 16px;
+}
+.nuz-field {
+  display: flex; flex-direction: column; gap: 5px;
+  font-family: nintendo-DS; font-size: 10px;
+  color: rgba(255,248,231,0.45); letter-spacing: 1.5px;
+  min-width: 200px;
+}
+.nuz-check {
+  display: flex; align-items: center; gap: 8px;
+  font-family: nintendo-DS; font-size: 12px;
+  color: rgba(255,248,231,0.7); letter-spacing: 1px; cursor: pointer;
+}
+.nuz-reset {
+  font-family: nintendo-DS; font-size: 12px;
+  background: #161616; border: 2px solid #383838; border-radius: 4px;
+  color: rgba(255,248,231,0.6); padding: 9px 14px;
+  letter-spacing: 1.5px; cursor: pointer; margin-left: auto;
+}
+.nuz-reset:hover { border-color: #FF6666; color: #FF8888; }
+
+.nuz-summary {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 9px; margin-bottom: 18px;
+}
+.nuz-stat {
+  background: #0d0d0d; border: 2px solid #262626; border-radius: 5px;
+  padding: 10px 12px; display: flex; flex-direction: column; gap: 4px;
+}
+.nz-label { font-family: nintendo-DS; font-size: 10px; color: rgba(255,248,231,0.4); letter-spacing: 1.5px; }
+.nz-val   { font-family: nintendo-DS; font-size: 20px; color: var(--yellow); }
+.nz-val.nz-dead { color: #FF6666; }
+
+.nuz-routes { display: flex; flex-direction: column; gap: 8px; }
+.nuz-loading {
+  text-align: center; padding: 40px 20px;
+  font-family: nintendo-DS; font-size: 13px;
+  color: rgba(255,248,231,0.3); letter-spacing: 2px;
+}
+.nuz-row {
+  display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center;
+  background: #111; border: 2px solid #262626; border-left-width: 5px;
+  border-radius: 5px; padding: 10px 14px;
+}
+.nuz-row.has-entry { border-left-color: #4a4a4a; }
+.nuz-row.st-team   { border-left-color: #6ECB63; }
+.nuz-row.st-box    { border-left-color: #6C8CC7; }
+.nuz-row.st-dead   { border-left-color: #FF5555; opacity: 0.62; }
+.nuz-row.st-missed { border-left-color: #555; opacity: 0.5; }
+.nuz-row.has-entry:not(.st-missed) { grid-template-columns: 1fr auto auto; }
+
+.nuz-zone { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.nz-name {
+  font-family: nintendo-DS; font-size: 14px;
+  color: var(--cream); letter-spacing: 0.5px;
+}
+.nz-pool {
+  align-self: flex-start;
+  font-family: nintendo-DS; font-size: 10px;
+  background: none; border: 2px solid #2a2a2a; border-radius: 3px;
+  color: rgba(255,248,231,0.4); padding: 2px 8px;
+  letter-spacing: 1px; cursor: pointer;
+}
+.nz-pool:hover { border-color: var(--yellow); color: var(--yellow); }
+.nz-missed { font-family: nintendo-DS; font-size: 11px; color: rgba(255,248,231,0.35); letter-spacing: 1.5px; }
+
+.nuz-mon { display: flex; align-items: center; gap: 10px; }
+.nuz-mon img { width: 48px; height: 48px; image-rendering: pixelated; cursor: pointer; }
+.nz-mon-text { display: flex; flex-direction: column; gap: 4px; }
+.nz-mon-name { font-family: nintendo-DS; font-size: 13px; color: var(--cream); text-transform: capitalize; }
+.nz-nick {
+  font-family: nintendo-DS; font-size: 12px;
+  background: #161616; border: 2px solid #333; border-radius: 3px;
+  color: var(--yellow); padding: 4px 8px; width: 130px;
+}
+.nz-nick:focus { border-color: var(--yellow); outline: none; }
+
+.nuz-actions { display: flex; align-items: center; gap: 7px; }
+.nz-roll, .nz-miss, .nz-clear {
+  font-family: nintendo-DS; font-size: 12px;
+  background: #161616; border: 2px solid #383838; border-radius: 4px;
+  color: var(--cream); padding: 8px 12px; letter-spacing: 1px; cursor: pointer;
+}
+.nz-roll:hover:not(:disabled) { border-color: var(--yellow); color: var(--yellow); }
+.nz-roll:disabled { opacity: 0.35; cursor: not-allowed; }
+.nz-miss:hover, .nz-clear:hover { border-color: #777; }
+.nz-status { min-width: 140px; }
+
+.nuz-pool-list {
+  grid-column: 1 / -1;
+  display: flex; flex-wrap: wrap; gap: 6px;
+  padding-top: 10px; margin-top: 4px;
+  border-top: 2px solid #1e1e1e;
+}
+.nz-cand {
+  display: flex; align-items: center; gap: 6px;
+  background: #0d0d0d; border: 2px solid #262626; border-radius: 4px;
+  padding: 4px 9px 4px 4px; cursor: pointer;
+  font-size: 12px; color: rgba(255,248,231,0.75); text-transform: capitalize;
+}
+.nz-cand img { width: 28px; height: 28px; image-rendering: pixelated; }
+.nz-cand:hover { border-color: var(--yellow); color: var(--yellow); }
+.nz-cand.dup { opacity: 0.4; }
+
+@media (max-width: 720px) {
+  .nuz-row, .nuz-row.has-entry:not(.st-missed) { grid-template-columns: 1fr; }
+  .nuz-actions { justify-content: flex-start; flex-wrap: wrap; }
+}
+
+/* ══════════════════════════════════════
    PALETA DE COMANDOS (Ctrl+K)
 ══════════════════════════════════════ */
 .palette-overlay {

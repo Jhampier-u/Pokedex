@@ -94,6 +94,7 @@
       <button class="mode-tab"        data-mode="duel"    role="tab" aria-selected="false" aria-controls="modeDuel">⚔️ <span>BATALLA</span></button>
       <button class="mode-tab"        data-mode="team"    role="tab" aria-selected="false" aria-controls="modeTeam">🛡️ <span>EQUIPO</span></button>
       <button class="mode-tab"        data-mode="roulette" role="tab" aria-selected="false" aria-controls="modeRoulette">🎲 <span>RULETA</span></button>
+      <button class="mode-tab"        data-mode="nuzlocke" role="tab" aria-selected="false" aria-controls="modeNuzlocke">💀 <span>NUZLOCKE</span></button>
     </nav>
 
     <!-- BODY -->
@@ -574,6 +575,32 @@
             <button class="rou-roll" id="rouRoll">🎲 GENERAR</button>
           </div>
           <div class="rou-result" id="rouResult"></div>
+        </div>
+      </section>
+
+      <!-- ═══════════════════════════════
+           MODE: TRACKER NUZLOCKE
+      ═══════════════════════════════ -->
+      <section class="mode-view hidden" id="modeNuzlocke" role="tabpanel" aria-label="Tracker Nuzlocke">
+        <div class="nuz-wrap">
+          <h2 class="tool-title">💀 TRACKER NUZLOCKE</h2>
+          <p class="tool-subtitle">Un encuentro por ruta, y lo que cae, cae</p>
+
+          <div class="nuz-config">
+            <label class="nuz-field">JUEGO
+              <select id="nuzVersion" class="dcfg-sel"></select>
+            </label>
+            <label class="nuz-check">
+              <input type="checkbox" id="nuzDupes" checked/>
+              <span>Cláusula de duplicados</span>
+            </label>
+            <button class="nuz-reset" id="nuzReset">⌫ Reiniciar run</button>
+          </div>
+
+          <div class="nuz-summary" id="nuzSummary"></div>
+          <div class="nuz-routes" id="nuzRoutes">
+            <p class="nuz-loading">Elige un juego para empezar.</p>
+          </div>
         </div>
       </section>
 

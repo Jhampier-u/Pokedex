@@ -8,26 +8,26 @@
 | | |
 |---|---|
 | Rama | `main`, sincronizada con `origin/main` |
-| Último trabajo | Paleta de comandos Ctrl+K (`git log -1` para el hash) |
+| Último trabajo | Tracker Nuzlocke, fase 1 (`git log -1` para el hash) |
 | Árbol de trabajo | Limpio, todo pusheado |
 | Remoto | https://github.com/Jhampier-u/Pokedex |
 | Servidor local | `python -m http.server 5599` (ya está en `.claude/launch.json` como `pokedex-static`) |
 
 ## Qué se acaba de terminar
 
-Tres cosas seguidas:
+**Tracker Nuzlocke (fase 1)**: modo nuevo con las zonas reales de cada juego,
+dado que solo saca especies que de verdad aparecen ahí, apodos, estados,
+cláusula de duplicados y persistencia.
 
-1. **Modalidades del quiz** — silueta, grito, entrada de Pokédex o
-   estadísticas, con contrarreloj de 10 s.
-2. **Números de dex regional** en la ficha, con 0 peticiones nuevas.
-3. **Paleta de comandos (Ctrl+K)** — buscador único sobre Pokémon,
-   movimientos, habilidades y acciones.
+De paso salió un bug serio: **los enlaces compartidos nunca funcionaron al
+abrir la página** (el hash se sobrescribía antes de leerlo). Arreglado y
+verificado. Ver Tanda 11 en [`02-HISTORIAL.md`](02-HISTORIAL.md).
 
 ## Qué toca ahora
 
-Nada empezado. De [`03-PENDIENTES.md`](03-PENDIENTES.md) queda como pieza
-grande el **tracker Nuzlocke**, y como opcionales filtrar por Pokédex regional
-y la deuda menor.
+Nada empezado. En [`03-PENDIENTES.md`](03-PENDIENTES.md) queda la **fase 2 del
+Nuzlocke** (orden de juego de las zonas, más reglas, cementerio), filtrar por
+Pokédex regional, y deuda menor.
 
 Antes de nada, lee la corrección nº 0 de [`02-HISTORIAL.md`](02-HISTORIAL.md):
 las pestañas de región filtran por *generación de origen* y eso **es

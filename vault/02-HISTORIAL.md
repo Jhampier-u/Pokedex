@@ -145,6 +145,32 @@ Verificado: abre con Ctrl+K incluso desde un campo de texto, flechas y Enter
 navegan, Escape cierra, y seleccionar un movimiento o habilidad abre su modal
 (Earthquake → «Terremoto», Levitate → «Levitación»).
 
+## Tanda 11 — Tracker Nuzlocke (fase 1) + bug de enlaces compartidos
+
+**Modo nuevo (`💀 NUZLOCKE`)**, el sexto. Los encuentros son los **reales del
+juego**: una consulta GraphQL trae qué especies aparecen en cada zona de esa
+versión (Rojo: 469 filas, 44 zonas, ~44 KB, 714 ms), cacheada en IndexedDB.
+
+- 29 juegos con encuentros registrados.
+- Por zona: dado que solo saca especies de esa zona, o elegir a mano de la
+  lista, o marcarla como fallada.
+- Apodo, estado (equipo / caja / muerto) y resumen en cabecera.
+- Cláusula de duplicados: marca en gris las especies ya capturadas en otra
+  zona y bloquea el dado si no queda ninguna libre.
+- Persistencia por juego e incluido en el export/import.
+
+**Bug encontrado de rebote, y era gordo:** los enlaces compartidos **nunca
+funcionaron al abrir la página**. `loadCatalog` leía `location.hash` *después*
+de `applyFilters`, y `applyFilters` dispara `scheduleDetailLoad` → `syncHash()`,
+que ya había sobrescrito el hash con `#/pokemon/1`. Abrir un enlace compartido
+siempre caía en Bulbasaur.
+
+No se detectó en la Tanda 4 porque allí probé cambiando `location.hash` sobre
+una página ya cargada (que va por `hashchange`, otro camino), nunca recargando
+con el hash puesto. Ahora la ruta se captura al entrar en `loadCatalog`.
+Verificado con `#/pokemon/448` → Lucario, `#/equipo/6,9,3` → los tres, y
+`#/nuzlocke` → el modo con su run restaurado.
+
 ## Correcciones a lo que dije por el camino
 
 Tres cosas que reporté mal y conviene no repetir:
