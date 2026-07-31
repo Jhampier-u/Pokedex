@@ -2,6 +2,11 @@
 
 Ordenado por retorno respecto al esfuerzo. Nada de esto está empezado.
 
+> **Antes de coger nada de esta lista**, mira
+> [`07-REDISENO.md`](07-REDISENO.md): hay un rediseño planificado que cambia el
+> stack. Varias ideas de aquí encajan mejor **después** de migrar, y la Fase 0
+> de ese plan aporta más que casi todo lo que sigue.
+
 ---
 
 ## 1. Nuzlocke: lo que aún falta · esfuerzo bajo-medio

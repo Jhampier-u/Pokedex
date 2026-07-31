@@ -12,6 +12,7 @@
 | Árbol de trabajo | Limpio, todo pusheado |
 | Remoto | https://github.com/Jhampier-u/Pokedex |
 | Desplegado | https://jhampier-u.github.io/Pokedex/ (GitHub Pages, verificado) |
+| Rediseño | Planificado en [`07-REDISENO.md`](07-REDISENO.md), sin empezar |
 | Servidor local | `python -m http.server 5599` (ya está en `.claude/launch.json` como `pokedex-static`) |
 
 ## Qué se acaba de terminar
@@ -27,8 +28,15 @@ crear una vista que nadie visita.
 
 ## Qué toca ahora
 
-Nada empezado. Con esto se cierra el bloque de objetos. Lo que queda en
-[`03-PENDIENTES.md`](03-PENDIENTES.md) son ideas menores.
+**Hay un rediseño planificado y sin empezar**: ver
+[`07-REDISENO.md`](07-REDISENO.md). Están tomadas las decisiones de gusto
+(consola CRT, framework completo, offline negociable, todas las pantallas) y
+hay un plan por fases. Falta aprobar tres cosas, listadas al final de ese
+documento.
+
+Si se retoma el rediseño, **la Fase 0 no exige migrar nada** y ya mejora la
+app: transiciones entre modos, animaciones en las pantallas que tienen cero, y
+profundidad al nivel de la Pokédex.
 
 ## Antes de tocar nada
 

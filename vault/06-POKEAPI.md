@@ -54,6 +54,11 @@ Repo `PokeAPI/sprites`, rutas bajo `sprites/pokemon`:
 | `other/home/{id}.png` | Arte de Pokémon HOME. **Sin usar** |
 | `versions/generation-i…viii/` | El mismo Pokémon por generación. **Sin usar** |
 
+> **Ojo, esta sección se ha quedado corta.** Desde que se escribió ya se
+> usan `/item`, `/berry`, `/pokedex`, `/nature`, `/encounter` y las Pokédex
+> regionales. El inventario actualizado y medido está en la sección 4 de
+> [`07-REDISENO.md`](07-REDISENO.md).
+
 ## Lo que queda por explotar
 
 ### Campos que ya descargamos y no leemos
@@ -69,10 +74,7 @@ Repo `PokeAPI/sprites`, rutas bajo `sprites/pokemon`:
 
 | Endpoint | Qué da | Idea |
 |---|---|---|
-| `/pokedex` (35) | Dexes regionales reales con su numeración | Arregla el bug de las formas regionales |
-| `/item` (2223) | Sprites, efecto, coste | Objetos equipados, piedras evolutivas |
-| `/machine` | MT/MO por juego | «Aprende MT24 Rayo» |
-| `/berry` (68) | Sabores, firmeza | Sección de bayas |
+| `/machine` (2372) | MT/MO por juego | «Aprende MT24 Rayo» |
 | `/egg-group` | Compatibilidad de cría | Calculadora de crianza |
 | `/growth-rate` | Tabla de EXP por nivel | Curvas de experiencia |
 | `/encounter-method`, `/location-area` | Encuentros reales por ruta | Base del tracker Nuzlocke |
