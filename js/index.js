@@ -281,35 +281,11 @@ const padId = id => String(id).padStart(3, "0");
 const getId = url => parseInt(url.split("/").filter(Boolean).pop(), 10);
 const clamp = (v, mn, mx) => Math.max(mn, Math.min(mx, v));
 
-// Sprites de la época: cada generación tenía su propio dibujo. El `max` evita
-// pedir imágenes que no existen (un Pokémon de gen V no tiene sprite de gen I),
-// así no hay 404 ni parpadeos de fallback.
-// Gen VIII se queda fuera a propósito: el repositorio solo tiene los iconos de
-// menú, que son diminutos y quedarían borrosos en el carrusel.
-const GEN_SPRITES = {
-  1: { path: "generation-i/red-blue",               max: 151, shiny: false },
-  2: { path: "generation-ii/crystal",               max: 251, shiny: true  },
-  3: { path: "generation-iii/emerald",              max: 386, shiny: true  },
-  4: { path: "generation-iv/platinum",              max: 493, shiny: true  },
-  5: { path: "generation-v/black-white",            max: 649, shiny: true  },
-  6: { path: "generation-vi/x-y",                   max: 721, shiny: true  },
-  7: { path: "generation-vii/ultra-sun-ultra-moon", max: 809, shiny: true  },
-};
-
-function spriteFor(id, { shiny = false, animated = false, gen = null } = {}) {
+// El modo generación NO cambia estos sprites a propósito: la tarjeta y el
+// carrusel muestran siempre el aspecto actual. Los sprites históricos viven en
+// la galería que se abre al pulsar el sprite de la ficha.
+function spriteFor(id, { shiny = false, animated = false } = {}) {
   const base = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon";
-
-  // Con reglas de otra generación, el sprite también cambia de época
-  const g = gen ?? state.gen;
-  if (!animated && g < CURRENT_GEN) {
-    const info = GEN_SPRITES[g];
-    if (info && id <= info.max) {
-      // En gen I no había variocolor: se muestra el normal, que es lo correcto
-      return shiny && info.shiny
-        ? `${base}/versions/${info.path}/shiny/${id}.png`
-        : `${base}/versions/${info.path}/${id}.png`;
-    }
-  }
   if (animated) {
     // Gen I-V tienen los GIF de Blanco/Negro. Para el resto tiramos de los
     // sprites de Showdown, que llegan casi hasta gen 9 — pero no están todos
@@ -332,9 +308,7 @@ function applySprite(img, id, opts = {}) {
   img.onerror = () => {
     if (img.dataset.fallback === "1") { img.onerror = null; return; }
     img.dataset.fallback = "1";
-    // El respaldo siempre es el sprite moderno: si falla el de época, volver a
-    // pedir el mismo de época no arreglaría nada.
-    img.src = spriteFor(id, { shiny: opts.shiny, gen: CURRENT_GEN });
+    img.src = spriteFor(id, { shiny: opts.shiny });
   };
   img.src = spriteFor(id, opts);
 }
@@ -652,9 +626,8 @@ function refreshSprites() {
   const cur = state.filtered[state.current];
   if (cur) {
     const img = $("pokemonSprite");
-    const info = GEN_SPRITES[state.gen];
-    if (info && cur.id <= info.max) applySprite(img, cur.id, { shiny: state.shinyMode });
-    else { img.onerror = null; img.src = officialArtFor(cur.id, state.shinyMode); }
+    img.onerror = null;
+    img.src = officialArtFor(cur.id, state.shinyMode);
   }
 }
 function updatePagination() {
@@ -835,6 +808,12 @@ document.addEventListener("keydown", e => {
   if (dataEl && !dataEl.classList.contains("hidden")) {
     if (e.key === "Escape") closeDialog(dataEl);
     else trapFocus(dataEl.querySelector(".help-card"), e);
+    return;
+  }
+  const galEl = document.getElementById("galleryOverlay");
+  if (galEl && !galEl.classList.contains("hidden")) {
+    if (e.key === "Escape") closeDialog(galEl);
+    else trapFocus(galEl.querySelector(".gal-card"), e);
     return;
   }
   const recentEl = document.getElementById("recentPanel");
@@ -1020,13 +999,11 @@ function renderAll(data, species) {
   $("pokeName").textContent   = data.name.toUpperCase();
   $("pokeGenus").textContent  = species.genus || "Pokémon";
 
-  // En modo generación la ficha también enseña el sprite de la época; el arte
-  // oficial solo existe en versión moderna.
   const img = $("pokemonSprite");
-  const info = GEN_SPRITES[state.gen];
-  if (info && data.id <= info.max) applySprite(img, data.id, { shiny: state.shinyMode });
-  else { img.onerror = null; img.src = officialArtFor(data.id, state.shinyMode); }
+  img.onerror = null;
+  img.src = officialArtFor(data.id, state.shinyMode);
   img.alt = data.name;
+  spriteGallery.data = data;          // la galería usa data.sprites.versions
 
   $("pokeHeight").textContent = `${(data.height / 10).toFixed(1)} m`;
   $("pokeWeight").textContent = `${(data.weight / 10).toFixed(1)} kg`;
@@ -2573,7 +2550,6 @@ function pdexBindControls() {
     state.gen   = g;
     activeChart = chartForGeneration(g);
     document.body.classList.toggle("retro-gen", g < CURRENT_GEN);
-    refreshSprites();                         // el carrusel cambia al sprite de la época
     loadCenterDetail();                       // repinta la ficha con las nuevas reglas
     if (TOOL_INITED.team && teamState.members.length) renderTeamAnalysis();
     if (TOOL_INITED.duel && duelState.A && duelState.B) runBattle();
@@ -2657,6 +2633,7 @@ function pdexInit() {
   }
   pdexBuildControls();
   buildPalette();
+  buildSpriteGallery();
   pdexBindControls();
   pdexSyncGenTabs();
   pdexRenderProgress();
@@ -3472,6 +3449,188 @@ function nuzSet(zona, entry) {
   }
   nuzSave();
   nuzRender();
+}
+
+// ════════════════════════════════════════════════════════
+//  GALERÍA DE SPRITES  (historia del Pokémon por juegos)
+//  Todo sale de data.sprites.versions, que ya viene en la respuesta de
+//  /pokemon: cero peticiones nuevas.
+// ════════════════════════════════════════════════════════
+const spriteGallery = { data: null };
+
+const GEN_ROMANO_A_NUM = { i:1, ii:2, iii:3, iv:4, v:5, vi:6, vii:7, viii:8, ix:9 };
+const JUEGO_LABELS = {
+  "red-blue":"Rojo/Azul", "yellow":"Amarillo",
+  "gold":"Oro", "silver":"Plata", "crystal":"Cristal",
+  "ruby-sapphire":"Rubí/Zafiro", "emerald":"Esmeralda",
+  "firered-leafgreen":"Rojo Fuego/Verde Hoja",
+  "diamond-pearl":"Diamante/Perla", "platinum":"Platino",
+  "heartgold-soulsilver":"HeartGold/SoulSilver",
+  "black-white":"Negro/Blanco",
+  "x-y":"X/Y", "omegaruby-alphasapphire":"Rubí Omega/Zafiro Alfa",
+  "ultra-sun-ultra-moon":"Ultrasol/Ultraluna",
+  "brilliant-diamond-shining-pearl":"Diamante Bri./Perla Rel.",
+  "scarlet-violet":"Escarlata/Púrpura",
+  "icons":"Iconos de menú",
+};
+const VISTA_LABELS = {
+  front_default:"Frontal", front_shiny:"Frontal ✦",
+  back_default:"Espalda", back_shiny:"Espalda ✦",
+  front_gray:"Frontal (gris)", back_gray:"Espalda (gris)",
+  front_transparent:"Frontal (sin fondo)", back_transparent:"Espalda (sin fondo)",
+  front_shiny_transparent:"Frontal ✦ (sin fondo)", back_shiny_transparent:"Espalda ✦ (sin fondo)",
+};
+const OTROS_LABELS = {
+  "official-artwork":"Arte oficial", home:"Pokémon HOME",
+  dream_world:"Dream World", showdown:"Showdown (animado)",
+};
+// La API devuelve los juegos alfabéticos (Cristal antes que Oro); aquí van en
+// el orden en que salieron.
+const JUEGO_ORDEN = [
+  "red-blue","yellow",
+  "gold","silver","crystal",
+  "ruby-sapphire","emerald","firered-leafgreen",
+  "diamond-pearl","platinum","heartgold-soulsilver",
+  "black-white",
+  "x-y","omegaruby-alphasapphire",
+  "ultra-sun-ultra-moon",
+  "brilliant-diamond-shining-pearl",
+  "scarlet-violet",
+  "icons",
+];
+
+// Orden de preferencia dentro de cada juego: lo interesante primero
+const VISTA_ORDEN = ["front_default","front_shiny","back_default","back_shiny",
+                     "front_transparent","front_gray","back_transparent","back_gray",
+                     "front_shiny_transparent","back_shiny_transparent"];
+
+function spritesDeJuego(obj) {
+  const salida = [];
+  VISTA_ORDEN.forEach(k => {
+    if (typeof obj[k] === "string" && obj[k]) salida.push({ vista: k, url: obj[k] });
+  });
+  // black-white trae además un sub-objeto "animated"
+  if (obj.animated && typeof obj.animated === "object") {
+    VISTA_ORDEN.forEach(k => {
+      if (typeof obj.animated[k] === "string" && obj.animated[k]) {
+        salida.push({ vista: k, url: obj.animated[k], animado: true });
+      }
+    });
+  }
+  return salida;
+}
+
+function renderSpriteGallery() {
+  const data = spriteGallery.data;
+  const host = $("galleryBody");
+  if (!host) return;
+  if (!data) { host.innerHTML = '<p class="gal-vacio">Sin datos.</p>'; return; }
+
+  $("galleryTitle").textContent = `SPRITES DE ${data.name.toUpperCase()}`;
+
+  const versiones = data.sprites?.versions || {};
+  const gens = Object.keys(versiones).sort((a, b) =>
+    (GEN_ROMANO_A_NUM[a.replace("generation-","")] || 99) -
+    (GEN_ROMANO_A_NUM[b.replace("generation-","")] || 99));
+
+  let html = "";
+  let total = 0;
+  gens.forEach(gen => {
+    const num = GEN_ROMANO_A_NUM[gen.replace("generation-","")];
+    const juegos = versiones[gen] || {};
+    let bloques = "";
+    const orden = Object.keys(juegos).sort((a, b) => {
+      const ia = JUEGO_ORDEN.indexOf(a), ib = JUEGO_ORDEN.indexOf(b);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a.localeCompare(b);
+    });
+    orden.forEach(juego => {
+      const items = spritesDeJuego(juegos[juego] || {});
+      if (items.length === 0) return;
+      total += items.length;
+      bloques += `
+        <div class="gal-juego">
+          <div class="gal-juego-nombre">${JUEGO_LABELS[juego] || prettyName(juego)}</div>
+          <div class="gal-fila">
+            ${items.map(i => `
+              <figure class="gal-item${i.animado ? " gal-anim" : ""}">
+                <img src="${i.url}" alt="${VISTA_LABELS[i.vista] || i.vista}" loading="lazy"/>
+                <figcaption>${VISTA_LABELS[i.vista] || i.vista}${i.animado ? " ▶" : ""}</figcaption>
+              </figure>`).join("")}
+          </div>
+        </div>`;
+    });
+    if (bloques) {
+      html += `<section class="gal-gen">
+        <h4 class="gal-gen-titulo">Generación ${"I II III IV V VI VII VIII IX".split(" ")[num-1] || num}</h4>
+        ${bloques}
+      </section>`;
+    }
+  });
+
+  // Arte moderno y variantes que no pertenecen a un juego concreto
+  const otros = data.sprites?.other || {};
+  let bloquesOtros = "";
+  Object.keys(otros).forEach(k => {
+    const items = spritesDeJuego(otros[k] || {});
+    if (items.length === 0) return;
+    total += items.length;
+    bloquesOtros += `
+      <div class="gal-juego">
+        <div class="gal-juego-nombre">${OTROS_LABELS[k] || prettyName(k)}</div>
+        <div class="gal-fila">
+          ${items.map(i => `
+            <figure class="gal-item gal-grande">
+              <img src="${i.url}" alt="${VISTA_LABELS[i.vista] || i.vista}" loading="lazy"/>
+              <figcaption>${VISTA_LABELS[i.vista] || i.vista}</figcaption>
+            </figure>`).join("")}
+        </div>
+      </div>`;
+  });
+  if (bloquesOtros) {
+    html += `<section class="gal-gen"><h4 class="gal-gen-titulo">Arte y otras versiones</h4>${bloquesOtros}</section>`;
+  }
+
+  host.innerHTML = html || '<p class="gal-vacio">Este Pokémon no tiene sprites de juegos anteriores.</p>';
+  $("gallerySub").textContent = `${total} sprites a lo largo de los juegos`;
+}
+
+function openSpriteGallery() {
+  if (!spriteGallery.data) return;
+  renderSpriteGallery();
+  openDialog($("galleryOverlay"), $("galleryClose"));
+}
+
+function buildSpriteGallery() {
+  const ov = document.createElement("div");
+  ov.className = "gallery-overlay hidden";
+  ov.id = "galleryOverlay";
+  ov.innerHTML = `
+    <div class="gal-card" role="dialog" aria-modal="true" aria-labelledby="galleryTitle">
+      <div class="gal-head">
+        <div>
+          <h3 class="gal-title" id="galleryTitle">SPRITES</h3>
+          <p class="gal-sub" id="gallerySub"></p>
+        </div>
+        <button class="help-close" id="galleryClose" aria-label="Cerrar">✕</button>
+      </div>
+      <div class="gal-body" id="galleryBody"></div>
+    </div>`;
+  document.body.appendChild(ov);
+  $("galleryClose").addEventListener("click", () => closeDialog(ov));
+  ov.addEventListener("click", e => { if (e.target === ov) closeDialog(ov); });
+
+  // El sprite de la ficha abre la galería (con teclado también)
+  const img = $("pokemonSprite");
+  if (img) {
+    img.tabIndex = 0;
+    img.setAttribute("role", "button");
+    img.title = "Ver todos los sprites de este Pokémon";
+    img.setAttribute("aria-label", "Ver todos los sprites de este Pokémon");
+    img.addEventListener("click", openSpriteGallery);
+    img.addEventListener("keydown", e => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openSpriteGallery(); }
+    });
+  }
 }
 
 // ════════════════════════════════════════════════════════

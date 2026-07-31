@@ -8,7 +8,7 @@
 | | |
 |---|---|
 | Rama | `main`, sincronizada con `origin/main` |
-| Último trabajo | Sprites de época en el modo generación (`git log -1` para el hash) |
+| Último trabajo | Galería de sprites por juegos (`git log -1` para el hash) |
 | Árbol de trabajo | Limpio, todo pusheado |
 | Remoto | https://github.com/Jhampier-u/Pokedex |
 | Desplegado | https://jhampier-u.github.io/Pokedex/ (GitHub Pages, verificado) |
@@ -16,16 +16,20 @@
 
 ## Qué se acaba de terminar
 
-**Sprites de época.** El modo generación ya cambiaba tabla de tipos y tipado;
-ahora también el sprite. Con reglas de Gen I, Bulbasaur se ve como en
-Rojo/Azul. Gen VIII queda fuera porque el repositorio solo tiene iconos de menú.
+**Galería de sprites.** Pulsando el sprite de la ficha se abre la historia
+completa del Pokémon: Bulbasaur tiene 79 sprites en 23 juegos. Sale de
+`data.sprites.versions`, que ya se descargaba, así que son 0 peticiones nuevas.
+
+La tarjeta y el carrusel muestran **siempre el aspecto actual**: el modo
+generación cambia reglas, no apariencia. (Primero se hizo al revés y el
+usuario pidió el cambio; ver Tanda 20.)
 
 ## Qué toca ahora
 
-Nada empezado. Está en estudio si merece la pena una **sección de objetos**
-(ver la nota al final de [`03-PENDIENTES.md`](03-PENDIENTES.md)): la conclusión
-provisional es que un catálogo de 2180 objetos no compensa, pero sí las
-conexiones con lo que ya existe.
+Nada empezado. Sobre la mesa quedan, de la conversación sobre objetos:
+mostrar los que lleva en salvaje (`held_items`, ya descargado) y las Pokéballs
+en la calculadora de captura. Ver la nota final de
+[`03-PENDIENTES.md`](03-PENDIENTES.md).
 
 ## Antes de tocar nada
 

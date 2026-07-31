@@ -3894,3 +3894,92 @@ body.retro-gen .pokedex-card { box-shadow: inset 0 0 0 2px rgba(255,215,0,0.18);
   cursor: pointer;
 }
 .evo-poke[role="button"] { cursor: pointer; }
+
+/* ══════════════════════════════════════
+   GALERÍA DE SPRITES
+   Se abre pulsando el sprite de la ficha. Los sprites de época viven aquí y
+   no en la tarjeta: la tarjeta muestra siempre el aspecto actual.
+══════════════════════════════════════ */
+.gallery-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.8);
+  backdrop-filter: blur(3px);
+  z-index: 10000;
+  display: flex; align-items: center; justify-content: center;
+  padding: 4vh 16px;
+}
+.gal-card {
+  width: 100%; max-width: 900px; max-height: 92vh;
+  background: #0e0e0e;
+  border: 3px solid var(--darker);
+  border-radius: 12px;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.gal-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 2px solid #222;
+}
+.gal-title {
+  font-family: poke-solid;
+  font-size: 22px; color: var(--yellow);
+  letter-spacing: 2px; margin: 0;
+}
+.gal-sub {
+  font-family: nintendo-DS; font-size: 11px;
+  color: rgba(255,248,231,0.4); letter-spacing: 1.5px;
+  margin: 5px 0 0;
+}
+.gal-body { overflow-y: auto; padding: 16px 18px 22px; }
+.gal-gen { margin-bottom: 22px; }
+.gal-gen-titulo {
+  font-family: nintendo-DS; font-size: 13px;
+  color: var(--yellow); letter-spacing: 2px;
+  margin: 0 0 10px;
+  padding-bottom: 5px;
+  border-bottom: 2px solid #262626;
+}
+.gal-juego { margin-bottom: 14px; }
+.gal-juego-nombre {
+  font-family: nintendo-DS; font-size: 11px;
+  color: rgba(255,248,231,0.5); letter-spacing: 1.5px;
+  margin-bottom: 7px;
+}
+.gal-fila { display: flex; flex-wrap: wrap; gap: 9px; }
+.gal-item {
+  margin: 0;
+  background: #141414;
+  border: 2px solid #262626;
+  border-radius: 6px;
+  padding: 8px 8px 6px;
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  min-width: 92px;
+}
+.gal-item:hover { border-color: var(--yellow); }
+.gal-item img {
+  width: 76px; height: 76px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+.gal-item.gal-grande img { width: 116px; height: 116px; image-rendering: auto; }
+.gal-item.gal-anim img { image-rendering: auto; }
+.gal-item figcaption {
+  font-family: nintendo-DS; font-size: 9px;
+  color: rgba(255,248,231,0.42);
+  letter-spacing: 0.5px; text-align: center;
+}
+.gal-vacio {
+  text-align: center; padding: 40px 20px;
+  font-family: nintendo-DS; font-size: 13px;
+  color: rgba(255,248,231,0.3); letter-spacing: 2px;
+}
+/* El sprite de la ficha ahora es pulsable */
+.pokemon-img { cursor: zoom-in; }
+
+@media (max-width: 720px) {
+  .gal-card { max-height: 94vh; }
+  .gal-item { min-width: 78px; }
+  .gal-item img { width: 62px; height: 62px; }
+  .gal-item.gal-grande img { width: 92px; height: 92px; }
+}

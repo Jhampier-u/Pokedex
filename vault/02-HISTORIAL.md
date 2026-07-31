@@ -408,25 +408,33 @@ Android. Se comprueba con el mismo script que detectó el problema.
 También: `sw.js` pasa a `VERSION v2` para invalidar la caché vieja, y se borró
 `Tareas Por Hacer.txt`, obsoleto desde que existen el README y el vault.
 
-## Tanda 20 — Sprites de época
+## Tanda 20 — Galería de sprites
 
-El modo generación ya cambiaba la tabla de tipos y el tipado; ahora **también
-cambia el sprite**. Con reglas de Gen I, Bulbasaur se ve como en Rojo/Azul.
+Primero se ató el sprite al modo generación (la tarjeta y el carrusel cambiaban
+de época). **El usuario lo probó y pidió otra cosa**: que la tarjeta enseñe
+siempre el aspecto actual, y que los sprites históricos vivan en una sección
+propia que se abre al pulsar el sprite.
 
-Un juego representativo por generación (`GEN_SPRITES`), con dos detalles que
-salieron de comprobar el repositorio en vez de suponer:
+Es mejor diseño: el selector de REGLAS cambia *reglas*, no apariencia, y la
+historia del Pokémon se ve entera de una vez en vez de una generación cada vez.
 
-- **Gen I no tiene carpeta shiny**, porque el variocolor no existía hasta Gen
-  II. Pedir shiny en Gen I devuelve el sprite normal, que es lo correcto.
-- **Gen VIII queda fuera a propósito**: el repositorio solo tiene iconos de
-  menú, diminutos, que quedarían borrosos en el carrusel.
+**La galería no usa rutas fijas**: sale de `data.sprites.versions`, que ya
+viene en la respuesta de `/pokemon`. **Cero peticiones nuevas** y cubre más de
+lo que yo había cableado a mano: Bulbasaur tiene **79 sprites en 23 juegos**,
+incluidos frontal/espalda, variocolor, versiones en gris y transparentes de
+Gen I, los animados de Negro/Blanco, y arte oficial, HOME, Dream World y
+Showdown.
 
-Cada generación lleva su `max` de Pokémon, así que un Pokémon posterior nunca
-pide un sprite que no existe: Lucario con reglas de Gen I muestra directamente
-el moderno, sin 404 ni parpadeo de respaldo.
+Detalles:
+- La API devuelve los juegos **alfabéticos** (Cristal antes que Oro); se
+  reordenan cronológicamente.
+- Degrada bien: Ogerpon, de Gen IX, muestra 8 sprites en 3 secciones.
+- Se abre con clic o con Enter sobre el sprite, que lleva `role="button"` y
+  `tabindex`, y devuelve el foco al cerrar.
 
-La ficha usa el sprite de época en vez del arte oficial (que solo existe en
-versión moderna) y vuelve al arte oficial al salir del modo.
+Curiosidad comprobada: el repositorio tiene sprites estilo Negro/Blanco para
+Pokémon de Gen IX (Ogerpon incluido) y **cargan de verdad**. Es dato real de la
+API, así que se muestran.
 
 ## Correcciones a lo que dije por el camino
 
